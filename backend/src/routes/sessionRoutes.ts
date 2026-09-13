@@ -15,5 +15,7 @@ router.get('/:id', SessionController.getSessionById);
 router.post('/start', requireTeacherOrAdmin, SessionController.startSession);
 router.post('/:id/close', requireTeacherOrAdmin, SessionController.closeSession);
 router.post('/:id/end', requireTeacherOrAdmin, SessionController.closeSession);
+router.patch('/:id/close', requireTeacherOrAdmin, SessionController.closeSession);
+router.patch('/:id/end', requireTeacherOrAdmin, SessionController.closeSession);
 
 export default router;
