@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-export const API_BASE = (import.meta as any).env?.VITE_API_URL || '/api';
+export const API_BASE = (import.meta as any).env?.VITE_API_URL || 'https://college-attendance-blond.vercel.app/api';
 
 export const api = axios.create({
   baseURL: API_BASE,

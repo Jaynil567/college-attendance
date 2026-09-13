@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-export const DEFAULT_API_URL = 'http://10.10.14.202:5000/api';
+export const DEFAULT_API_URL = 'https://college-attendance-blond.vercel.app/api';
 
 export const mobileApi = axios.create({
   baseURL: DEFAULT_API_URL,
