@@ -1,0 +1,213 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
+import { useMobileAuth } from '../context/AuthContext';
+import { setApiBaseUrl, DEFAULT_API_URL } from '../services/api';
+
+export const ProfileScreen: React.FC = () => {
+  const { student, logout } = useMobileAuth();
+  const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const handleSaveApiUrl = () => {
+    setApiBaseUrl(apiUrl.trim());
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2000);
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.avatarSection}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{student?.fullName.charAt(0) || 'S'}</Text>
+        </View>
+        <Text style={styles.name}>{student?.fullName}</Text>
+        <View style={styles.idBadge}>
+          <Text style={styles.idText}>{student?.enrollmentNumber}</Text>
+        </View>
+      </View>
+
+      <View style={styles.infoCard}>
+        <Text style={styles.cardHeader}>ACADEMIC ENROLLMENT</Text>
+
+        <View style={styles.row}>
+          <Text style={styles.label}>Class / Branch</Text>
+          <Text style={styles.val}>{student?.className || 'Computer Engineering'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Subject</Text>
+          <Text style={styles.val}>{student?.subject || 'Computer Networks'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Semester & Division</Text>
+          <Text style={styles.val}>Sem {student?.semester || '5'} - Div {student?.division || 'A'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Account Status</Text>
+          <Text style={[styles.val, styles.activeVal]}>{student?.status?.toUpperCase() || 'ACTIVE'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Email Address</Text>
+          <Text style={styles.val}>{student?.email || 'N/A'}</Text>
+        </View>
+        <View style={[styles.row, styles.noBorder]}>
+          <Text style={styles.label}>Phone</Text>
+          <Text style={styles.val}>{student?.phoneNumber || 'N/A'}</Text>
+        </View>
+      </View>
+
+      {/* Network / Backend API Host Config */}
+      <View style={styles.infoCard}>
+        <Text style={styles.cardHeader}>BACKEND SERVER URL (LAN / WI-FI)</Text>
+        <Text style={styles.helperText}>
+          When testing on a physical iPhone or Android phone, enter your PC's LAN IP (e.g. http://192.168.1.15:5000/api):
+        </Text>
+        <TextInput
+          style={styles.apiInput}
+          value={apiUrl}
+          onChangeText={setApiUrl}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveApiUrl}>
+          <Text style={styles.saveBtnText}>{savedSuccess ? 'Saved!' : 'Update Server URL'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+        <Text style={styles.logoutText}>Sign Out of Student Portal</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#1E3A8A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  avatarText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  idBadge: {
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  idText: {
+    color: '#1D4ED8',
+    fontSize: 12,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cardHeader: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  noBorder: {
+    borderBottomWidth: 0,
+  },
+  label: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  val: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  activeVal: {
+    color: '#15803D',
+    fontWeight: '800',
+  },
+  helperText: {
+    fontSize: 11,
+    color: '#64748B',
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  apiInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 12,
+    color: '#0F172A',
+    fontFamily: 'monospace',
+    marginBottom: 8,
+  },
+  saveBtn: {
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    color: '#2563EB',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  logoutButton: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  logoutText: {
+    color: '#B91C1C',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+});
