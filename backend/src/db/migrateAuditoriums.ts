@@ -10,7 +10,8 @@ async function migrate() {
   
   // 1. Students table updates
   await pool.query('ALTER TABLE students ADD COLUMN IF NOT EXISTS plain_password VARCHAR(255)');
-  console.log('✅ Added plain_password to students');
+  await pool.query("UPDATE students SET plain_password = 'student123' WHERE plain_password IS NULL");
+  console.log('✅ Added plain_password to students and populated null entries');
 
   // 2. Attendance Sessions updates
   await pool.query('ALTER TABLE attendance_sessions ALTER COLUMN class_id DROP NOT NULL');
