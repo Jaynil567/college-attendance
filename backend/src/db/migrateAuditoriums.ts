@@ -31,8 +31,8 @@ async function migrate() {
     {
       id: 'e1111111-1111-1111-1111-111111111101',
       esp32_id: 'AUDITORIUM_01',
-      device_name: 'Auditorium 1 Presence Node',
-      classroom_id: 'AUDITORIUM_1',
+      device_name: 'Engineering Auditorium Presence Node',
+      classroom_id: 'ENGINEERING_AUDITORIUM',
       service_uuid: '4fafc201-1fb5-459e-8fcc-c5c9c3319141',
       char_challenge_uuid: 'beb5483e-36e1-4688-b7f5-ea07361b26a8',
       char_response_uuid: 'beb5483f-36e1-4688-b7f5-ea07361b26a9',
@@ -41,8 +41,8 @@ async function migrate() {
     {
       id: 'e1111111-1111-1111-1111-111111111102',
       esp32_id: 'AUDITORIUM_02',
-      device_name: 'Auditorium 2 Presence Node',
-      classroom_id: 'AUDITORIUM_2',
+      device_name: 'Architecture Auditorium Presence Node',
+      classroom_id: 'ARCHITECTURE_AUDITORIUM',
       service_uuid: '4fafc201-1fb5-459e-8fcc-c5c9c3319142',
       char_challenge_uuid: 'beb5483e-36e1-4688-b7f5-ea07361b26a8',
       char_response_uuid: 'beb5483f-36e1-4688-b7f5-ea07361b26a9',
@@ -51,8 +51,8 @@ async function migrate() {
     {
       id: 'e1111111-1111-1111-1111-111111111103',
       esp32_id: 'AUDITORIUM_03',
-      device_name: 'Auditorium 3 Presence Node',
-      classroom_id: 'AUDITORIUM_3',
+      device_name: 'LAW Auditorium Presence Node',
+      classroom_id: 'LAW_AUDITORIUM',
       service_uuid: '4fafc201-1fb5-459e-8fcc-c5c9c3319143',
       char_challenge_uuid: 'beb5483e-36e1-4688-b7f5-ea07361b26a8',
       char_response_uuid: 'beb5483f-36e1-4688-b7f5-ea07361b26a9',

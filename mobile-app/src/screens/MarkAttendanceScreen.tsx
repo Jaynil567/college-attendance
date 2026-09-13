@@ -27,9 +27,9 @@ interface AuditoriumStatus {
 export const MarkAttendanceScreen: React.FC = () => {
   const { student } = useMobileAuth();
   const [auditoriums, setAuditoriums] = useState<AuditoriumStatus[]>([
-    { id: 'AUDITORIUM_01', name: 'Auditorium 1', isLive: false, activeSession: null, hasMarkedAttendance: false },
-    { id: 'AUDITORIUM_02', name: 'Auditorium 2', isLive: false, activeSession: null, hasMarkedAttendance: false },
-    { id: 'AUDITORIUM_03', name: 'Auditorium 3', isLive: false, activeSession: null, hasMarkedAttendance: false },
+    { id: 'AUDITORIUM_01', name: 'Engineering Auditorium', isLive: false, activeSession: null, hasMarkedAttendance: false },
+    { id: 'AUDITORIUM_02', name: 'Architecture Auditorium', isLive: false, activeSession: null, hasMarkedAttendance: false },
+    { id: 'AUDITORIUM_03', name: 'LAW Auditorium', isLive: false, activeSession: null, hasMarkedAttendance: false },
   ]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

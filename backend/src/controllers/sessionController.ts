@@ -5,9 +5,9 @@ import { query } from '../config/db.js';
 import { ENV } from '../config/env.js';
 
 const AUDITORIUM_CONFIG = [
-  { id: 'AUDITORIUM_01', name: 'Auditorium 1' },
-  { id: 'AUDITORIUM_02', name: 'Auditorium 2' },
-  { id: 'AUDITORIUM_03', name: 'Auditorium 3' },
+  { id: 'AUDITORIUM_01', name: 'Engineering Auditorium' },
+  { id: 'AUDITORIUM_02', name: 'Architecture Auditorium' },
+  { id: 'AUDITORIUM_03', name: 'LAW Auditorium' },
 ];
 
 const startSessionSchema = z.object({

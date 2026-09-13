@@ -25,9 +25,9 @@ export const LiveSession: React.FC<{
 }> = ({ onRefresh }) => {
   const { user } = useAuth();
   const [auditoriums, setAuditoriums] = useState<AuditoriumState[]>([
-    { id: 'AUDITORIUM_01', name: 'Auditorium 1', isLive: false, activeSession: null },
-    { id: 'AUDITORIUM_02', name: 'Auditorium 2', isLive: false, activeSession: null },
-    { id: 'AUDITORIUM_03', name: 'Auditorium 3', isLive: false, activeSession: null },
+    { id: 'AUDITORIUM_01', name: 'Engineering Auditorium', isLive: false, activeSession: null },
+    { id: 'AUDITORIUM_02', name: 'Architecture Auditorium', isLive: false, activeSession: null },
+    { id: 'AUDITORIUM_03', name: 'LAW Auditorium', isLive: false, activeSession: null },
   ]);
   const [selectedAudiId, setSelectedAudiId] = useState<string>('AUDITORIUM_01');
   const [sessionRecords, setSessionRecords] = useState<any[]>([]);
@@ -392,9 +392,9 @@ export const LiveSession: React.FC<{
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'AUDITORIUM_01', name: 'Auditorium 1' },
-                { id: 'AUDITORIUM_02', name: 'Auditorium 2' },
-                { id: 'AUDITORIUM_03', name: 'Auditorium 3' },
+                { id: 'AUDITORIUM_01', name: 'Engineering Auditorium' },
+                { id: 'AUDITORIUM_02', name: 'Architecture Auditorium' },
+                { id: 'AUDITORIUM_03', name: 'LAW Auditorium' },
               ].map((audi) => (
                 <button
                   key={audi.id}
