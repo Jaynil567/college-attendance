@@ -4,8 +4,10 @@ import { useMobileAuth } from '../context/AuthContext';
 import { DEFAULT_API_URL, setApiBaseUrl, mobileApi } from '../services/api';
 
 export const LoginScreen: React.FC = () => {
-  const { login, isLoading } = useMobileAuth();
+  const { loginStudent, loginTeacher, isLoading } = useMobileAuth();
+  const [selectedRole, setSelectedRole] = useState<'student' | 'teacher'>('student');
   const [enrollmentNumber, setEnrollmentNumber] = useState('');
+  const [teacherEmail, setTeacherEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showServerConfig, setShowServerConfig] = useState(false);
@@ -13,14 +15,26 @@ export const LoginScreen: React.FC = () => {
   const [configSuccess, setConfigSuccess] = useState<string | null>(null);
 
   const handleLogin = async () => {
-    if (!enrollmentNumber.trim() || !password.trim()) {
-      setErrorMessage('Please enter both enrollment number and password.');
-      return;
-    }
     setErrorMessage(null);
-    const result = await login(enrollmentNumber.trim().toUpperCase(), password);
-    if (!result.success && result.message) {
-      setErrorMessage(result.message);
+
+    if (selectedRole === 'student') {
+      if (!enrollmentNumber.trim() || !password.trim()) {
+        setErrorMessage('Please enter both enrollment number and password.');
+        return;
+      }
+      const result = await loginStudent(enrollmentNumber.trim().toUpperCase(), password);
+      if (!result.success && result.message) {
+        setErrorMessage(result.message);
+      }
+    } else {
+      if (!teacherEmail.trim() || !password.trim()) {
+        setErrorMessage('Please enter both faculty email and password.');
+        return;
+      }
+      const result = await loginTeacher(teacherEmail.trim().toLowerCase(), password);
+      if (!result.success && result.message) {
+        setErrorMessage(result.message);
+      }
     }
   };
 
@@ -36,12 +50,47 @@ export const LoginScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
+        {/* Role Toggle Selector */}
+        <View style={styles.roleSelectorContainer}>
+          <TouchableOpacity
+            style={[styles.roleTab, selectedRole === 'student' && styles.roleTabActive]}
+            onPress={() => {
+              setSelectedRole('student');
+              setErrorMessage(null);
+            }}
+          >
+            <Text style={[styles.roleTabText, selectedRole === 'student' && styles.roleTabTextActive]}>
+              🎓 Student
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.roleTab, selectedRole === 'teacher' && styles.roleTabActive]}
+            onPress={() => {
+              setSelectedRole('teacher');
+              setErrorMessage(null);
+            }}
+          >
+            <Text style={[styles.roleTabText, selectedRole === 'teacher' && styles.roleTabTextActive]}>
+              👨‍🏫 Teacher
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.header}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>BLE PRESENCE VERIFICATION</Text>
+          <View style={[styles.badge, selectedRole === 'teacher' && styles.badgeTeacher]}>
+            <Text style={[styles.badgeText, selectedRole === 'teacher' && styles.badgeTeacherText]}>
+              {selectedRole === 'teacher' ? 'FACULTY PRESENCE BEACON' : 'BLE PRESENCE VERIFICATION'}
+            </Text>
           </View>
-          <Text style={styles.title}>Student Attendance</Text>
-          <Text style={styles.subtitle}>Sign in with your college-issued enrollment ID</Text>
+          <Text style={styles.title}>
+            {selectedRole === 'teacher' ? 'Faculty Portal' : 'Student Attendance'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {selectedRole === 'teacher'
+              ? 'Sign in to start 3-Auditorium BLE attendance broadcast'
+              : 'Sign in with your college-issued enrollment ID'}
+          </Text>
         </View>
 
         {errorMessage && (
@@ -51,17 +100,32 @@ export const LoginScreen: React.FC = () => {
         )}
 
         <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>ENROLLMENT NUMBER</Text>
-            <TextInput
-              style={styles.input}
-              value={enrollmentNumber}
-              onChangeText={setEnrollmentNumber}
-              placeholder="e.g. EN2024CS001"
-              autoCapitalize="characters"
-              placeholderTextColor="#94A3B8"
-            />
-          </View>
+          {selectedRole === 'student' ? (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>ENROLLMENT NUMBER</Text>
+              <TextInput
+                style={styles.input}
+                value={enrollmentNumber}
+                onChangeText={setEnrollmentNumber}
+                placeholder="e.g. 24002171210010"
+                autoCapitalize="characters"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+          ) : (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>FACULTY EMAIL ADDRESS</Text>
+              <TextInput
+                style={styles.input}
+                value={teacherEmail}
+                onChangeText={setTeacherEmail}
+                placeholder="e.g. teacher@college.edu"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+          )}
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>PASSWORD</Text>
@@ -76,23 +140,33 @@ export const LoginScreen: React.FC = () => {
           </View>
 
           <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              selectedRole === 'teacher' && styles.buttonTeacher,
+              isLoading && styles.buttonDisabled,
+            ]}
             onPress={handleLogin}
             disabled={isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>
+                {selectedRole === 'teacher' ? 'Sign In as Faculty' : 'Sign In as Student'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Notice: Self-registration disallowed */}
+        {/* Notice */}
         <View style={styles.noticeBox}>
-          <Text style={styles.noticeTitle}>Official College Portal</Text>
+          <Text style={styles.noticeTitle}>
+            {selectedRole === 'teacher' ? 'Faculty Instructions' : 'Official College Portal'}
+          </Text>
           <Text style={styles.noticeDesc}>
-            Accounts are provisioned directly by the department faculty. Use your official college credentials.
+            {selectedRole === 'teacher'
+              ? 'Select your auditorium (Engineering, Architecture, or LAW) and subject to broadcast BLE presence for students.'
+              : 'Accounts are provisioned directly by the department faculty. Use your registered enrollment number.'}
           </Text>
         </View>
 
@@ -144,6 +218,44 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 8,
+  },
+  roleSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+  },
+  roleTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  roleTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  roleTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  roleTabTextActive: {
+    color: '#0F172A',
+  },
+  badgeTeacher: {
+    backgroundColor: '#DCFCE7',
+  },
+  badgeTeacherText: {
+    color: '#15803D',
+  },
+  buttonTeacher: {
+    backgroundColor: '#059669',
   },
   header: {
     alignItems: 'center',

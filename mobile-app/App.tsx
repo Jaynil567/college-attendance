@@ -5,15 +5,25 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { MarkAttendanceScreen } from './src/screens/MarkAttendanceScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { TeacherSessionScreen } from './src/screens/TeacherSessionScreen';
 
 type Tab = 'mark' | 'history' | 'profile';
 
 const MainNavigator: React.FC = () => {
-  const { student, token } = useMobileAuth();
+  const { role, student, teacher, token } = useMobileAuth();
   const [activeTab, setActiveTab] = useState<Tab>('mark');
 
-  if (!token || !student) {
+  if (!token || (!student && !teacher)) {
     return <LoginScreen />;
+  }
+
+  if (role === 'teacher') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor="#064E3B" />
+        <TeacherSessionScreen />
+      </SafeAreaView>
+    );
   }
 
   return (

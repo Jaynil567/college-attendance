@@ -47,4 +47,17 @@ export const MobileApiService = {
   }) => mobileApi.post('/attendance/mark', data),
 
   getHistory: () => mobileApi.get('/attendance/history'),
+
+  // Teacher Endpoints
+  teacherLogin: (email: string, password: string) =>
+    mobileApi.post('/auth/teacher/login', { email, password }),
+
+  startSession: (data: { auditoriumId: string; sessionName: string }) =>
+    mobileApi.post('/sessions/start', data),
+
+  endSession: (id: string) =>
+    mobileApi.post(`/sessions/${id}/end`),
+
+  getSessionDetails: (id: string) =>
+    mobileApi.get(`/sessions/${id}`),
 };

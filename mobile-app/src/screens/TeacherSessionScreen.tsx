@@ -1,0 +1,706 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+} from 'react-native';
+import { useMobileAuth } from '../context/AuthContext';
+import { MobileApiService } from '../services/api';
+
+const AUDITORIUM_OPTIONS = [
+  { id: 'AUDITORIUM_01', name: 'Engineering Auditorium', icon: '⚙️' },
+  { id: 'AUDITORIUM_02', name: 'Architecture Auditorium', icon: '🏛️' },
+  { id: 'AUDITORIUM_03', name: 'LAW Auditorium', icon: '⚖️' },
+];
+
+export const TeacherSessionScreen: React.FC = () => {
+  const { teacher, logout } = useMobileAuth();
+  const [selectedAudiId, setSelectedAudiId] = useState<'AUDITORIUM_01' | 'AUDITORIUM_02' | 'AUDITORIUM_03'>('AUDITORIUM_01');
+  const [subjectTitle, setSubjectTitle] = useState('');
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [sessionRecords, setSessionRecords] = useState<any[]>([]);
+  const [auditoriumsStatus, setAuditoriumsStatus] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const timerRef = useRef<any>(null);
+  const pollRef = useRef<any>(null);
+
+  // 1. Initial Load: Check if teacher has an active session
+  const checkStatus = async () => {
+    try {
+      const res = await MobileApiService.getAuditoriumsStatus();
+      if (res.data.success && res.data.auditoriums) {
+        setAuditoriumsStatus(res.data.auditoriums);
+
+        // Check if any auditorium has a session created by this teacher
+        const myActive = res.data.auditoriums.find(
+          (a: any) =>
+            a.isLive &&
+            a.activeSession &&
+            (a.activeSession.teacherName === teacher?.fullName ||
+              a.activeSession.created_by === teacher?.id)
+        );
+
+        if (myActive && myActive.activeSession) {
+          setActiveSession(myActive.activeSession);
+          setSelectedAudiId(myActive.id);
+          fetchSessionRecords(myActive.activeSession.id);
+        } else if (!activeSession) {
+          setActiveSession(null);
+          setSessionRecords([]);
+        }
+      }
+    } catch (err: any) {
+      console.warn('[TeacherSession] checkStatus error', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSessionRecords = async (sessionId: string) => {
+    try {
+      const res = await MobileApiService.getSessionDetails(sessionId);
+      if (res.data.success && res.data.records) {
+        setSessionRecords(res.data.records);
+      }
+    } catch (err) {
+      console.warn('[TeacherSession] fetchSessionRecords error', err);
+    }
+  };
+
+  useEffect(() => {
+    checkStatus();
+  }, []);
+
+  // Timer & Polling effect during active session
+  useEffect(() => {
+    if (activeSession) {
+      // Start elapsed timer
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+
+      // Poll attendance records every 3 seconds
+      pollRef.current = setInterval(() => {
+        if (activeSession.id) {
+          fetchSessionRecords(activeSession.id);
+        }
+      }, 3000);
+    } else {
+      setElapsedSeconds(0);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (pollRef.current) clearInterval(pollRef.current);
+    }
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [activeSession?.id]);
+
+  const handleStartSession = async () => {
+    if (!subjectTitle.trim()) {
+      Alert.alert('Subject Required', 'Please enter a Subject / Lecture title before starting attendance.');
+      return;
+    }
+
+    const audiObj = AUDITORIUM_OPTIONS.find((a) => a.id === selectedAudiId);
+    const audiStatus = auditoriumsStatus.find((a) => a.id === selectedAudiId);
+
+    if (audiStatus && audiStatus.isLive) {
+      Alert.alert(
+        'Auditorium Busy',
+        `${audiObj?.name || selectedAudiId} currently has an ongoing lecture (${audiStatus.activeSession?.sessionName || 'Active'}). Please select another auditorium or wait for it to end.`
+      );
+      return;
+    }
+
+    setStarting(true);
+    try {
+      const res = await MobileApiService.startSession({
+        auditoriumId: selectedAudiId,
+        sessionName: subjectTitle.trim(),
+      });
+
+      if (res.data.success && res.data.session) {
+        setActiveSession(res.data.session);
+        setSessionRecords([]);
+        setElapsedSeconds(0);
+        await checkStatus();
+      } else {
+        Alert.alert('Error', res.data.message || 'Could not start attendance session.');
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Failed to start session. Check your internet connection.';
+      Alert.alert('Start Failed', msg);
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const handleEndSession = async () => {
+    if (!activeSession) return;
+
+    Alert.alert(
+      'End Attendance Session?',
+      `Are you sure you want to stop attendance? ${sessionRecords.length} students have been recorded.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'End Session',
+          style: 'destructive',
+          onPress: async () => {
+            setEnding(true);
+            try {
+              await MobileApiService.endSession(activeSession.id);
+              Alert.alert(
+                'Attendance Completed',
+                `Attendance recorded for ${sessionRecords.length} students in ${activeSession.sessionName || subjectTitle}.`
+              );
+              setActiveSession(null);
+              setSessionRecords([]);
+              setSubjectTitle('');
+              await checkStatus();
+            } catch (err: any) {
+              Alert.alert('Error', err.response?.data?.message || 'Could not end session.');
+            } finally {
+              setEnding(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const formatTimer = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#059669" />
+        <Text style={styles.loadingText}>Syncing 3-Auditorium status...</Text>
+      </View>
+    );
+  }
+
+  const selectedAudiObj = AUDITORIUM_OPTIONS.find((a) => a.id === selectedAudiId);
+
+  return (
+    <View style={styles.container}>
+      {/* Top Faculty Header */}
+      <View style={styles.facultyHeader}>
+        <View style={styles.facultyInfo}>
+          <Text style={styles.facultyBadge}>👨‍🏫 FACULTY ATTENDANCE BEACON</Text>
+          <Text style={styles.facultyName}>{teacher?.fullName || 'College Faculty'}</Text>
+          <Text style={styles.facultyDept}>{teacher?.department || teacher?.email || 'General Engineering'}</Text>
+        </View>
+        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+          <Text style={styles.logoutBtnText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={checkStatus} />}
+      >
+        {/* ACTIVE SESSION STATE */}
+        {activeSession ? (
+          <View style={styles.activeCard}>
+            <View style={styles.activeBanner}>
+              <View style={styles.pulseDot} />
+              <Text style={styles.activeBannerText}>📡 BLE PRESENCE BROADCAST ACTIVE</Text>
+            </View>
+
+            <Text style={styles.activeAudiName}>
+              {selectedAudiObj?.icon} {selectedAudiObj?.name}
+            </Text>
+            <Text style={styles.activeSubject}>
+              {activeSession.session_name || activeSession.sessionName || subjectTitle}
+            </Text>
+
+            {/* Live Counter & Timer Row */}
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>{sessionRecords.length}</Text>
+                <Text style={styles.statLabel}>Students Present</Text>
+              </View>
+
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>{formatTimer(elapsedSeconds)}</Text>
+                <Text style={styles.statLabel}>Elapsed Time (5-10m)</Text>
+              </View>
+            </View>
+
+            <Text style={styles.broadcastTip}>
+              Keep this screen active while students in {selectedAudiObj?.name} tap "Mark Attendance" on their phones.
+            </Text>
+
+            {/* Real-Time Attendance Stream List */}
+            <View style={styles.liveListContainer}>
+              <Text style={styles.liveListTitle}>
+                Real-Time Check-In Stream ({sessionRecords.length})
+              </Text>
+              {sessionRecords.length === 0 ? (
+                <View style={styles.emptyList}>
+                  <Text style={styles.emptyListEmoji}>⏳</Text>
+                  <Text style={styles.emptyListText}>Waiting for students to check in...</Text>
+                  <Text style={styles.emptyListSub}>Students in this room will appear here automatically</Text>
+                </View>
+              ) : (
+                sessionRecords.map((rec, index) => (
+                  <View key={rec.id || index} style={styles.recordRow}>
+                    <View style={styles.recordLeft}>
+                      <Text style={styles.recordName}>{rec.full_name || 'Student'}</Text>
+                      <Text style={styles.recordEnrollment}>{rec.enrollment_number}</Text>
+                    </View>
+                    <View style={styles.recordRight}>
+                      <Text style={styles.recordTime}>
+                        {rec.marked_at
+                          ? new Date(rec.marked_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })
+                          : 'Verified'}
+                      </Text>
+                      <Text style={styles.recordBadge}>✅ Verified</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* End Session Button */}
+            <TouchableOpacity
+              style={[styles.endSessionBtn, ending && styles.btnDisabled]}
+              onPress={handleEndSession}
+              disabled={ending}
+            >
+              {ending ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.endSessionBtnText}>⏹️ Stop Attendance Broadcast</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          /* START NEW SESSION STATE */
+          <View style={styles.startCard}>
+            <Text style={styles.sectionHeading}>Step 1: Select Your Lecture Auditorium</Text>
+            <Text style={styles.sectionSubtitle}>
+              Select the auditorium where your concurrent lecture is taking place:
+            </Text>
+
+            {/* 3 Auditorium Cards */}
+            <View style={styles.audiGrid}>
+              {AUDITORIUM_OPTIONS.map((audi) => {
+                const isSelected = selectedAudiId === audi.id;
+                const status = auditoriumsStatus.find((a) => a.id === audi.id);
+                const isBusy = status && status.isLive;
+
+                return (
+                  <TouchableOpacity
+                    key={audi.id}
+                    style={[
+                      styles.audiChoiceCard,
+                      isSelected && styles.audiChoiceCardSelected,
+                      isBusy && styles.audiChoiceCardBusy,
+                    ]}
+                    onPress={() => setSelectedAudiId(audi.id as any)}
+                  >
+                    <Text style={styles.audiChoiceIcon}>{audi.icon}</Text>
+                    <Text style={[styles.audiChoiceName, isSelected && styles.audiChoiceNameSelected]}>
+                      {audi.name}
+                    </Text>
+                    <View style={styles.audiStatusBadge}>
+                      {isBusy ? (
+                        <Text style={styles.audiBusyText}>🔴 In Use ({status.activeSession?.sessionName})</Text>
+                      ) : (
+                        <Text style={styles.audiVacantText}>🟢 Available</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Step 2: Subject Input */}
+            <Text style={[styles.sectionHeading, { marginTop: 24 }]}>Step 2: Enter Subject / Lecture Title</Text>
+            <TextInput
+              style={styles.subjectInput}
+              value={subjectTitle}
+              onChangeText={setSubjectTitle}
+              placeholder="e.g. Cloud Computing & Distributed Systems"
+              placeholderTextColor="#94A3B8"
+            />
+
+            {/* Notice info */}
+            <View style={styles.infoBox}>
+              <Text style={styles.infoTitle}>⚡ 10-Minute Phone BLE Attendance</Text>
+              <Text style={styles.infoDesc}>
+                Once you click start, your phone broadcasts the attendance beacon for {selectedAudiObj?.name}. Students in this room can mark attendance in 5-10 minutes.
+              </Text>
+            </View>
+
+            {/* Start Button */}
+            <TouchableOpacity
+              style={[styles.startSessionBtn, starting && styles.btnDisabled]}
+              onPress={handleStartSession}
+              disabled={starting}
+            >
+              {starting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.startSessionBtnText}>
+                  🟢 Start Attendance in {selectedAudiObj?.name}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  facultyHeader: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  facultyInfo: {
+    flex: 1,
+  },
+  facultyBadge: {
+    color: '#6EE7B7',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  facultyName: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  facultyDept: {
+    color: '#A7F3D0',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  logoutBtn: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  logoutBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  sectionHeading: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 12,
+  },
+  startCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  audiGrid: {
+    gap: 10,
+  },
+  audiChoiceCard: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 14,
+  },
+  audiChoiceCardSelected: {
+    borderColor: '#059669',
+    backgroundColor: '#ECFDF5',
+  },
+  audiChoiceCardBusy: {
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+  },
+  audiChoiceIcon: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  audiChoiceName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  audiChoiceNameSelected: {
+    color: '#065F46',
+  },
+  audiStatusBadge: {
+    marginTop: 6,
+  },
+  audiVacantText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  audiBusyText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  subjectInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#0F172A',
+    marginTop: 8,
+  },
+  infoBox: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 16,
+  },
+  infoTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#166534',
+  },
+  infoDesc: {
+    fontSize: 11,
+    color: '#15803D',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  startSessionBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  startSessionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  activeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#10B981',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  activeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#16A34A',
+    marginRight: 8,
+  },
+  activeBannerText: {
+    color: '#15803D',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  activeAudiName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  activeSubject: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#059669',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  broadcastTip: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 14,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  liveListContainer: {
+    marginTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 16,
+  },
+  liveListTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#334155',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  emptyList: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyListEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyListText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  emptyListSub: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  recordRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  recordLeft: {
+    flex: 1,
+  },
+  recordName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  recordEnrollment: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  recordRight: {
+    alignItems: 'flex-end',
+  },
+  recordTime: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  recordBadge: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+    marginTop: 2,
+  },
+  endSessionBtn: {
+    backgroundColor: '#DC2626',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  endSessionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+});
