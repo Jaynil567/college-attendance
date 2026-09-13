@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { getDbPool } from '../config/db.js';
 
 async function migrate() {
@@ -10,8 +11,9 @@ async function migrate() {
   
   // 1. Students table updates
   await pool.query('ALTER TABLE students ADD COLUMN IF NOT EXISTS plain_password VARCHAR(255)');
-  await pool.query("UPDATE students SET plain_password = 'student123' WHERE plain_password IS NULL");
-  console.log('✅ Added plain_password to students and populated null entries');
+  const defaultHash = await bcrypt.hash('student123', 10);
+  await pool.query("UPDATE students SET plain_password = 'student123', password_hash = $1 WHERE plain_password IS NULL OR plain_password = 'student123'", [defaultHash]);
+  console.log('✅ Added plain_password to students and synced password hashes');
 
   // 2. Attendance Sessions updates
   await pool.query('ALTER TABLE attendance_sessions ALTER COLUMN class_id DROP NOT NULL');
