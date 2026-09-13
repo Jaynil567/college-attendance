@@ -58,14 +58,15 @@ export class StudentController {
 
       // Hash default or provided password
       const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(password || 'student123', salt);
+      const studentPassword = password || 'student123';
+      const passwordHash = await bcrypt.hash(studentPassword, salt);
       const studentId = crypto.randomUUID();
 
       const result = await query(
-        `INSERT INTO students (id, enrollment_number, full_name, email, phone_number, password_hash, class_id, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-         RETURNING id, enrollment_number, full_name, email, phone_number, class_id, status, created_at`,
-        [studentId, cleanEnrollment, fullName.trim(), email?.trim() || null, phoneNumber?.trim() || null, passwordHash, classId || null, status]
+        `INSERT INTO students (id, enrollment_number, full_name, email, phone_number, password_hash, plain_password, class_id, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         RETURNING id, enrollment_number, full_name, email, phone_number, plain_password, class_id, status, created_at`,
+        [studentId, cleanEnrollment, fullName.trim(), email?.trim() || null, phoneNumber?.trim() || null, passwordHash, studentPassword, classId || null, status]
       );
 
       res.status(201).json({
@@ -88,7 +89,7 @@ export class StudentController {
 
       let sql = `
         SELECT s.id, s.enrollment_number, s.full_name, s.email, s.phone_number,
-               s.status, s.created_at, s.updated_at,
+               s.plain_password, s.status, s.created_at, s.updated_at,
                c.id as class_id, c.class_name, c.subject, c.semester, c.division
         FROM students s
         LEFT JOIN classes c ON s.class_id = c.id
@@ -133,7 +134,7 @@ export class StudentController {
       const { id } = req.params;
       const studentRes = await query(
         `SELECT s.id, s.enrollment_number, s.full_name, s.email, s.phone_number,
-                s.status, s.created_at,
+                s.plain_password, s.status, s.created_at,
                 c.id as class_id, c.class_name, c.subject, c.semester, c.division
          FROM students s
          LEFT JOIN classes c ON s.class_id = c.id
@@ -216,10 +217,12 @@ export class StudentController {
         const hash = await bcrypt.hash(password, salt);
         params.push(hash);
         updates.push(`password_hash = $${params.length}`);
+        params.push(password);
+        updates.push(`plain_password = $${params.length}`);
       }
 
       params.push(id);
-      const sql = `UPDATE students SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING id, enrollment_number, full_name, email, phone_number, class_id, status, updated_at`;
+      const sql = `UPDATE students SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING id, enrollment_number, full_name, email, phone_number, plain_password, class_id, status, updated_at`;
 
       const result = await query(sql, params);
       if (!result.rows || result.rows.length === 0) {

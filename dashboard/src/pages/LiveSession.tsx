@@ -1,144 +1,242 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../services/api.js';
-import { Radio, Play, Square, CheckCircle2, Clock, ShieldCheck, Wifi } from 'lucide-react';
+import { Radio, Play, Square, ShieldCheck, Wifi, Download, Building2, User, BookOpen } from 'lucide-react';
 import { Modal } from '../components/Modal.js';
+import { useAuth } from '../context/AuthContext.js';
+
+interface AuditoriumState {
+  id: string;
+  name: string;
+  isLive: boolean;
+  activeSession: {
+    id: string;
+    subject: string;
+    sessionName: string;
+    teacherName: string;
+    startTime: string;
+    presentCount: number;
+  } | null;
+}
 
 export const LiveSession: React.FC<{
-  classes: any[];
-  devices: any[];
+  classes?: any[];
+  devices?: any[];
   onRefresh: () => void;
-}> = ({ classes, devices, onRefresh }) => {
-  const [activeSession, setActiveSession] = useState<any | null>(null);
+}> = ({ onRefresh }) => {
+  const { user } = useAuth();
+  const [auditoriums, setAuditoriums] = useState<AuditoriumState[]>([
+    { id: 'AUDITORIUM_01', name: 'Auditorium 1', isLive: false, activeSession: null },
+    { id: 'AUDITORIUM_02', name: 'Auditorium 2', isLive: false, activeSession: null },
+    { id: 'AUDITORIUM_03', name: 'Auditorium 3', isLive: false, activeSession: null },
+  ]);
+  const [selectedAudiId, setSelectedAudiId] = useState<string>('AUDITORIUM_01');
   const [sessionRecords, setSessionRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
 
-  // Form State
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedDeviceId, setSelectedDeviceId] = useState('');
-  const [sessionName, setSessionName] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState(45);
+  // Start Session Form State (Only Auditorium + Subject!)
+  const [formAuditoriumId, setFormAuditoriumId] = useState<'AUDITORIUM_01' | 'AUDITORIUM_02' | 'AUDITORIUM_03'>('AUDITORIUM_01');
+  const [subjectTitle, setSubjectTitle] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  // Poll active session details
-  const fetchActiveSession = async () => {
+  // Poll 3 Auditoriums real-time status & active feed
+  const fetchAuditoriumStatus = async () => {
     try {
-      const res = await ApiService.getActiveSessions();
-      if (res.data.success && res.data.sessions && res.data.sessions.length > 0) {
-        const current = res.data.sessions[0];
-        setActiveSession(current);
+      const res = await ApiService.getAuditoriumsStatus();
+      if (res.data.success && res.data.auditoriums) {
+        setAuditoriums(res.data.auditoriums);
 
-        // Fetch live records for this session
-        const detailsRes = await ApiService.getSessionById(current.id);
-        if (detailsRes.data.success) {
-          setSessionRecords(detailsRes.data.records || []);
+        // Find active session for selected auditorium to load check-in feed
+        const selectedAudi = res.data.auditoriums.find((a: any) => a.id === selectedAudiId);
+        if (selectedAudi?.activeSession) {
+          const feedRes = await ApiService.getSessionById(selectedAudi.activeSession.id);
+          if (feedRes.data.success) {
+            setSessionRecords(feedRes.data.records || []);
+          }
+        } else {
+          setSessionRecords([]);
         }
-      } else {
-        setActiveSession(null);
-        setSessionRecords([]);
       }
     } catch (err) {
-      console.error('Error fetching live session', err);
+      console.error('Error fetching auditorium status', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchActiveSession();
-    const interval = setInterval(fetchActiveSession, 3000); // Real-time poll every 3s
+    fetchAuditoriumStatus();
+    const interval = setInterval(fetchAuditoriumStatus, 3000); // 3-second live sync
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedAudiId]);
+
+  const handleOpenStartModal = (preselectedAudiId?: string) => {
+    if (preselectedAudiId) {
+      setFormAuditoriumId(preselectedAudiId as any);
+    }
+    setSubjectTitle('');
+    setFormError(null);
+    setIsStartModalOpen(true);
+  };
 
   const handleStartSession = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!subjectTitle.trim()) {
+      setFormError('Please enter a subject or lecture title');
+      return;
+    }
+
     setFormError(null);
     setSubmitting(true);
 
     try {
       const res = await ApiService.startSession({
-        classId: selectedClassId,
-        esp32Id: selectedDeviceId,
-        sessionName: sessionName || 'Classroom Attendance Session',
-        durationMinutes: Number(durationMinutes),
+        auditoriumId: formAuditoriumId,
+        subject: subjectTitle.trim(),
       });
 
       if (res.data.success) {
         setIsStartModalOpen(false);
-        fetchActiveSession();
+        setSelectedAudiId(formAuditoriumId);
+        await fetchAuditoriumStatus();
         onRefresh();
       }
     } catch (err: any) {
-      setFormError(err.response?.data?.message || 'Failed to start session');
+      setFormError(err.response?.data?.message || 'Failed to start auditorium session');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleCloseSession = async () => {
-    if (!activeSession) return;
-    if (window.confirm('Are you sure you want to close this attendance session early?')) {
+  const handleEndSession = async (sessionId: string, audiName: string) => {
+    if (window.confirm(`Are you sure you want to end the live lecture session in ${audiName}?`)) {
       try {
-        await ApiService.closeSession(activeSession.id);
-        setActiveSession(null);
-        setSessionRecords([]);
-        fetchActiveSession();
+        await ApiService.endSession(sessionId);
+        await fetchAuditoriumStatus();
         onRefresh();
       } catch (err) {
-        console.error('Error closing session', err);
+        console.error('Error ending session', err);
       }
     }
   };
+
+  const handleExportExcel = async (sessionId: string) => {
+    try {
+      setExporting(true);
+      await ApiService.exportExcel({ sessionId });
+    } catch (err) {
+      console.error('Failed to export Excel', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const currentAuditorium = auditoriums.find((a) => a.id === selectedAudiId) || auditoriums[0];
+  const currentActiveSession = currentAuditorium?.activeSession;
 
   return (
     <div className="space-y-6">
       {/* Page Title & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Live Attendance Session Monitor</h2>
-          <p className="text-xs text-slate-500">
-            Real-time BLE hardware check-in stream. Verified students appear instantly.
+          <div className="flex items-center space-x-2">
+            <Building2 className="w-6 h-6 text-blue-600" />
+            <h2 className="text-2xl font-extrabold text-slate-900">3-Auditorium Lecture Center</h2>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Concurrent lectures in 3 auditoriums. Select an auditorium and subject to go live.
           </p>
         </div>
 
-        {!activeSession ? (
-          <button
-            onClick={() => setIsStartModalOpen(true)}
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"
-          >
-            <Play className="w-4 h-4" />
-            <span>Start Attendance Window</span>
-          </button>
-        ) : (
-          <button
-            onClick={handleCloseSession}
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"
-          >
-            <Square className="w-4 h-4 fill-white" />
-            <span>Lock & Close Attendance</span>
-          </button>
-        )}
+        <button
+          onClick={() => handleOpenStartModal()}
+          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"
+        >
+          <Play className="w-4 h-4 fill-white" />
+          <span>Go Live / Start Lecture</span>
+        </button>
       </div>
 
-      {!activeSession ? (
-        <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center shadow-sm">
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl mx-auto flex items-center justify-center mb-4">
-            <Radio className="w-8 h-8" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-800">No Attendance Session Currently Active</h3>
-          <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-6">
-            To start taking attendance, initiate a session by pairing your class with the room's ESP32 device.
-          </p>
-          <button
-            onClick={() => setIsStartModalOpen(true)}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-lg transition-all inline-flex items-center space-x-2"
-          >
-            <Play className="w-4 h-4 fill-white" />
-            <span>Launch Attendance Window</span>
-          </button>
-        </div>
-      ) : (
+      {/* 3 Auditoriums Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {auditoriums.map((audi) => {
+          const isSelected = selectedAudiId === audi.id;
+          const isLive = audi.isLive && !!audi.activeSession;
+
+          return (
+            <div
+              key={audi.id}
+              onClick={() => setSelectedAudiId(audi.id)}
+              className={`cursor-pointer rounded-2xl p-5 border transition-all relative overflow-hidden ${
+                isSelected
+                  ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md bg-white'
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+              }`}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className={`w-3 h-3 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                  <h3 className="font-extrabold text-slate-900 text-base">{audi.name}</h3>
+                </div>
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    isLive
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {isLive ? 'LIVE NOW' : 'VACANT'}
+                </span>
+              </div>
+
+              {/* Status Info */}
+              {isLive ? (
+                <div className="space-y-2 mt-2">
+                  <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3">
+                    <p className="text-xs text-emerald-900 font-bold truncate">
+                      {audi.activeSession?.subject}
+                    </p>
+                    <div className="flex items-center space-x-1.5 text-[11px] text-emerald-700 mt-1">
+                      <User className="w-3 h-3" />
+                      <span>{audi.activeSession?.teacherName || 'Faculty'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-slate-500">
+                      Attendance: <strong className="text-emerald-700 font-bold">{audi.activeSession?.presentCount || 0}</strong> present
+                    </span>
+                    <span className="text-[11px] text-blue-600 font-semibold hover:underline">
+                      View Feed →
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-4 text-center">
+                  <p className="text-xs text-slate-400 mb-3">No lecture running currently</p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenStartModal(audi.id);
+                    }}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 text-xs font-semibold rounded-lg transition-colors inline-flex items-center space-x-1"
+                  >
+                    <Play className="w-3 h-3" />
+                    <span>Start Lecture Here</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Selected Auditorium Active View */}
+      {currentActiveSession ? (
         <div className="space-y-6">
           {/* Active Banner */}
           <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 text-white shadow-xl shadow-emerald-900/10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -146,27 +244,47 @@ export const LiveSession: React.FC<{
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping"></span>
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-100">
-                  Accepting Student Check-ins
+                  Live Attendance Active • {currentAuditorium.name}
                 </span>
               </div>
-              <h3 className="text-2xl font-black">{activeSession.session_name}</h3>
-              <p className="text-emerald-100 text-sm">
-                <strong>{activeSession.class_name}</strong> • {activeSession.subject} (Sem {activeSession.semester}, Div {activeSession.division})
+              <h3 className="text-2xl font-black">{currentActiveSession.subject}</h3>
+              <p className="text-emerald-100 text-sm flex items-center space-x-3">
+                <span>Faculty: <strong>{currentActiveSession.teacherName}</strong></span>
+                <span>•</span>
+                <span>Started: <strong>{new Date(currentActiveSession.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
               </p>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-emerald-100/90 pt-1">
-                <span>Hardware Node: <strong>{activeSession.device_esp32_id || 'ESP32'}</strong></span>
-                <span>Room: <strong>{activeSession.classroom_id || 'Classroom'}</strong></span>
-                <span>UUID: <code className="bg-white/10 px-1.5 py-0.5 rounded text-[11px]">{activeSession.service_uuid?.slice(0, 18)}...</code></span>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-100/90 pt-1">
+                <span>ESP32 Node: <strong>{currentAuditorium.id}</strong></span>
+                <span>•</span>
+                <span>Students verify automatically via ESP32 BLE Challenge-Response</span>
               </div>
             </div>
 
-            <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl p-5 text-center min-w-[180px]">
-              <span className="text-xs text-emerald-100 font-semibold uppercase tracking-wider block">Checked In</span>
-              <span className="text-4xl font-black">{sessionRecords.length}</span>
-              <span className="text-xs text-emerald-100 block mt-1 flex items-center justify-center space-x-1">
-                <Clock className="w-3.5 h-3.5" />
-                <span>Ends {new Date(activeSession.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              </span>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl px-6 py-4 text-center min-w-[140px]">
+                <span className="text-xs text-emerald-100 font-semibold uppercase tracking-wider block">Checked In</span>
+                <span className="text-3xl font-black">{sessionRecords.length}</span>
+                <span className="text-[11px] text-emerald-100 block mt-0.5">Students Present</span>
+              </div>
+
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => handleExportExcel(currentActiveSession.id)}
+                  disabled={exporting}
+                  className="px-4 py-2.5 bg-white text-emerald-900 font-bold text-xs rounded-xl shadow-sm hover:bg-emerald-50 transition-all flex items-center justify-center space-x-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{exporting ? 'Exporting...' : 'Export Excel (.xlsx)'}</span>
+                </button>
+
+                <button
+                  onClick={() => handleEndSession(currentActiveSession.id, currentAuditorium.name)}
+                  className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center space-x-1.5"
+                >
+                  <Square className="w-3.5 h-3.5 fill-white" />
+                  <span>End Live Session</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -174,18 +292,22 @@ export const LiveSession: React.FC<{
           <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h4 className="font-bold text-slate-900">Live Presence Feed ({sessionRecords.length} Students)</h4>
-                <p className="text-xs text-slate-400">Cryptographically signed via ESP32 BLE Challenge-Response</p>
+                <h4 className="font-bold text-slate-900">
+                  Live Attendance Feed for {currentAuditorium.name} ({sessionRecords.length} Students)
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Cryptographically verified via {currentAuditorium.id} BLE hardware beacon
+                </p>
               </div>
               <div className="flex items-center space-x-2 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Live Feed Active</span>
+                <span>Auto-Refreshing Stream</span>
               </div>
             </div>
 
             {sessionRecords.length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-sm">
-                Waiting for students to press "Mark Attendance" on their mobile app...
+                Waiting for students in {currentAuditorium.name} to tap "Mark Attendance" on their phone...
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -197,7 +319,7 @@ export const LiveSession: React.FC<{
                       <th className="px-6 py-3.5">Student Name</th>
                       <th className="px-6 py-3.5">Time Checked In</th>
                       <th className="px-6 py-3.5">BLE Signal (RSSI)</th>
-                      <th className="px-6 py-3.5">Cryptographic Status</th>
+                      <th className="px-6 py-3.5">Security Verification</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -218,7 +340,7 @@ export const LiveSession: React.FC<{
                         <td className="px-6 py-3.5">
                           <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
                             <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>VERIFIED</span>
+                            <span>ESP32 HMAC VERIFIED</span>
                           </span>
                         </td>
                       </tr>
@@ -229,13 +351,32 @@ export const LiveSession: React.FC<{
             )}
           </div>
         </div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center shadow-sm">
+          <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center mb-3">
+            <Radio className="w-7 h-7" />
+          </div>
+          <h3 className="text-base font-bold text-slate-800">
+            {currentAuditorium.name} is Currently Vacant
+          </h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-5">
+            No lecture is taking place right now. Click below to start taking attendance in {currentAuditorium.name}.
+          </p>
+          <button
+            onClick={() => handleOpenStartModal(currentAuditorium.id)}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all inline-flex items-center space-x-2"
+          >
+            <Play className="w-3.5 h-3.5 fill-white" />
+            <span>Start Lecture in {currentAuditorium.name}</span>
+          </button>
+        </div>
       )}
 
-      {/* Start Session Modal */}
+      {/* Start Session Modal (Auditorium + Subject only; NO DURATION) */}
       <Modal
         isOpen={isStartModalOpen}
         onClose={() => setIsStartModalOpen(false)}
-        title="Start Classroom Attendance Session"
+        title="Start Live Lecture Session"
       >
         <form onSubmit={handleStartSession} className="space-y-4">
           {formError && (
@@ -244,63 +385,56 @@ export const LiveSession: React.FC<{
             </div>
           )}
 
+          {/* Auditorium Selection */}
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Class / Subject</label>
-            <select
-              required
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- Select Class --</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.class_name} • {c.subject} (Sem {c.semester}-{c.division})
-                </option>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-2">
+              Select Auditorium
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'AUDITORIUM_01', name: 'Auditorium 1' },
+                { id: 'AUDITORIUM_02', name: 'Auditorium 2' },
+                { id: 'AUDITORIUM_03', name: 'Auditorium 3' },
+              ].map((audi) => (
+                <button
+                  key={audi.id}
+                  type="button"
+                  onClick={() => setFormAuditoriumId(audi.id as any)}
+                  className={`py-3 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                    formAuditoriumId === audi.id
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {audi.name}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
+          {/* Subject / Lecture Title */}
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Classroom ESP32 Device</label>
-            <select
-              required
-              value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- Select ESP32 Device Node --</option>
-              {devices.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.esp32_id} • {d.device_name} ({d.classroom_id})
-                </option>
-              ))}
-            </select>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+              Subject / Lecture Title
+            </label>
+            <div className="relative">
+              <BookOpen className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <input
+                type="text"
+                required
+                value={subjectTitle}
+                onChange={(e) => setSubjectTitle(e.target.value)}
+                placeholder="e.g. Data Structures & Algorithms, Physics, AI"
+                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Students inside this auditorium will see this lecture title and can tap to mark attendance.
+            </p>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Session Topic / Name</label>
-            <input
-              type="text"
-              required
-              value={sessionName}
-              onChange={(e) => setSessionName(e.target.value)}
-              placeholder="e.g. Lecture 15 - TCP Congestion Control"
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Duration (Minutes)</label>
-            <input
-              type="number"
-              min="5"
-              max="180"
-              required
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Number(e.target.value))}
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800">
+            ℹ️ <strong>Open Duration</strong>: Session will remain active until you click "End Session".
           </div>
 
           <div className="pt-2 flex justify-end space-x-2">
@@ -314,9 +448,10 @@ export const LiveSession: React.FC<{
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50"
+              className="px-5 py-2.5 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 inline-flex items-center space-x-1.5 shadow-md"
             >
-              {submitting ? 'Starting...' : 'Open Attendance Window'}
+              <Play className="w-3.5 h-3.5 fill-white" />
+              <span>{submitting ? 'Starting...' : 'Go Live Now'}</span>
             </button>
           </div>
         </form>
@@ -324,3 +459,4 @@ export const LiveSession: React.FC<{
     </div>
   );
 };
+

@@ -1,64 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl } from 'react-native';
 import { useMobileAuth } from '../context/AuthContext';
 import { MobileApiService } from '../services/api';
 import { BleService, BleScanResult, HandshakeResult } from '../services/bleService';
 
+interface AuditoriumStatus {
+  id: string;
+  name: string;
+  isLive: boolean;
+  activeSession: {
+    id: string;
+    subject: string;
+    sessionName: string;
+    teacherName: string;
+    startTime: string;
+    presentCount: number;
+  } | null;
+  hasMarkedAttendance: boolean;
+  device?: {
+    service_uuid: string;
+    char_challenge_uuid: string;
+    char_response_uuid: string;
+  } | null;
+}
+
 export const MarkAttendanceScreen: React.FC = () => {
   const { student } = useMobileAuth();
-  const [activeSession, setActiveSession] = useState<any | null>(null);
-  const [loadingSession, setLoadingSession] = useState(true);
+  const [auditoriums, setAuditoriums] = useState<AuditoriumStatus[]>([
+    { id: 'AUDITORIUM_01', name: 'Auditorium 1', isLive: false, activeSession: null, hasMarkedAttendance: false },
+    { id: 'AUDITORIUM_02', name: 'Auditorium 2', isLive: false, activeSession: null, hasMarkedAttendance: false },
+    { id: 'AUDITORIUM_03', name: 'Auditorium 3', isLive: false, activeSession: null, hasMarkedAttendance: false },
+  ]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Verification pipeline states: 'idle' | 'scanning' | 'handshake' | 'verifying' | 'success' | 'rejected'
+  // Active targeted verification flow
+  const [activeAudiTarget, setActiveAudiTarget] = useState<AuditoriumStatus | null>(null);
   const [flowState, setFlowState] = useState<'idle' | 'scanning' | 'handshake' | 'verifying' | 'success' | 'rejected'>('idle');
   const [detectedBeacon, setDetectedBeacon] = useState<BleScanResult | null>(null);
   const [verificationFeedback, setVerificationFeedback] = useState<string>('');
   const [rejectionCode, setRejectionCode] = useState<string>('');
   const [verificationStats, setVerificationStats] = useState<any>(null);
 
-  // Mode toggle (Hardware vs Simulator)
+  // Simulator vs Hardware BLE toggle
   const [isSimulator, setIsSimulator] = useState(false);
 
-  const fetchSession = async () => {
+  const fetchAuditoriums = async () => {
     try {
-      setLoadingSession(true);
-      const res = await MobileApiService.getActiveSession();
-      if (res.data.success && res.data.sessions && res.data.sessions.length > 0) {
-        setActiveSession(res.data.sessions[0]);
-      } else {
-        setActiveSession(null);
+      const res = await MobileApiService.getAuditoriumsStatus();
+      if (res.data.success && res.data.auditoriums) {
+        setAuditoriums(res.data.auditoriums);
       }
     } catch (err) {
-      console.error('Failed to load active session', err);
+      console.error('Failed to load auditoriums status', err);
     } finally {
-      setLoadingSession(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchSession();
+    fetchAuditoriums();
+    const interval = setInterval(fetchAuditoriums, 4000); // 4-second live status poll
+    return () => clearInterval(interval);
   }, []);
 
-  const handleMarkAttendance = async () => {
-    if (!activeSession || !student) return;
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAuditoriums();
+  };
+
+  const handleMarkAttendance = async (audi: AuditoriumStatus) => {
+    if (!audi.activeSession || !student) return;
+
+    setActiveAudiTarget(audi);
+    setFlowState('scanning');
+    setVerificationFeedback(`Scanning for ${audi.name} ESP32 BLE Beacon...`);
 
     try {
-      setFlowState('scanning');
-      setVerificationFeedback('Scanning for Classroom ESP32 BLE Beacon...');
-
-      // Step 1 & 2: Discover Classroom ESP32
       BleService.setSimulationMode(isSimulator);
-      const scanResult = await BleService.scanForClassroomEsp32(activeSession.service_uuid);
+      const serviceUuid = audi.device?.service_uuid || '4fafc201-1fb5-459e-8fcc-c5c9c3319141';
+
+      // Step 1: Scan for this specific Auditorium's ESP32
+      const scanResult = await BleService.scanForClassroomEsp32(serviceUuid, audi.id, `${audi.name} ESP32`);
       setDetectedBeacon(scanResult);
 
-      // Step 3 & 4: Cryptographic Challenge-Response Handshake
+      // Step 2: Cryptographic Handshake
       setFlowState('handshake');
-      setVerificationFeedback(`Connecting to ${scanResult.esp32Id}... Exchanging 32-byte cryptographic challenge.`);
+      setVerificationFeedback(`Connected to ${audi.name} ESP32. Exchanging cryptographic challenge...`);
 
       const handshakeResult: HandshakeResult = await BleService.performChallengeResponse({
-        esp32Id: scanResult.esp32Id,
+        esp32Id: audi.id,
         studentEnrollment: student.enrollmentNumber,
-        targetServiceUuid: scanResult.serviceUuid,
+        targetServiceUuid: serviceUuid,
       });
 
       if (!handshakeResult.success) {
@@ -68,60 +102,73 @@ export const MarkAttendanceScreen: React.FC = () => {
         return;
       }
 
-      // Step 5 & 6: Submit Verification Result to Backend API
+      // Step 3: Transmit verification to Backend
       setFlowState('verifying');
-      setVerificationFeedback('Transmitting cryptographic proof to Neon PostgreSQL backend...');
+      setVerificationFeedback('Recording attendance in Neon PostgreSQL...');
 
       const response = await MobileApiService.markAttendance({
-        sessionId: activeSession.id,
-        esp32Id: scanResult.esp32Id,
+        sessionId: audi.activeSession.id,
+        esp32Id: audi.id,
         challenge: handshakeResult.challenge,
         response: handshakeResult.response,
         timestamp: handshakeResult.timestamp,
         rssi: handshakeResult.rssi,
-        deviceInfo: scanResult.isSimulated ? 'Mobile Device (BLE Simulator)' : 'Mobile Phone (Hardware BLE)',
+        deviceInfo: isSimulator ? 'Mobile App (Simulator)' : 'Mobile App (BLE Hardware)',
       });
 
-      // Step 7: Attendance Inserted
       if (response.data.success) {
         setFlowState('success');
-        setVerificationFeedback('Physical presence confirmed! Attendance recorded.');
+        setVerificationFeedback(`Presence confirmed in ${audi.name}! Attendance recorded.`);
         setVerificationStats({
+          auditoriumName: audi.name,
+          subject: audi.activeSession.subject,
           markedAt: new Date().toLocaleTimeString(),
           rssi: handshakeResult.rssi,
           latency: handshakeResult.latencyMs,
-          esp32Id: scanResult.esp32Id,
+          esp32Id: audi.id,
         });
+
+        // Update local state immediately
+        setAuditoriums((prev) =>
+          prev.map((item) => (item.id === audi.id ? { ...item, hasMarkedAttendance: true } : item))
+        );
       }
     } catch (err: any) {
-      // Step 8: Rejection Handling
       setFlowState('rejected');
       const errData = err.response?.data;
       setRejectionCode(errData?.error || 'ATTENDANCE_REJECTED');
-      setVerificationFeedback(errData?.message || 'Attendance submission failed. Please verify with instructor.');
+      setVerificationFeedback(errData?.message || 'Verification failed. Please ensure you are inside the auditorium.');
     }
   };
 
   const resetFlow = () => {
     setFlowState('idle');
+    setActiveAudiTarget(null);
     setVerificationFeedback('');
     setRejectionCode('');
-    fetchSession();
+    fetchAuditoriums();
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Student Welcome Banner */}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />}
+    >
+      {/* Student Welcome Header */}
       <View style={styles.studentBanner}>
-        <Text style={styles.studentGreeting}>Welcome, {student?.fullName}</Text>
+        <Text style={styles.studentGreeting}>Hello, {student?.fullName || 'Student'}</Text>
         <Text style={styles.studentMeta}>
-          {student?.enrollmentNumber} • {student?.subject || 'Engineering'} (Sem {student?.semester}-{student?.division})
+          Enrollment No: <Text style={styles.statBold}>{student?.enrollmentNumber}</Text>
+        </Text>
+        <Text style={styles.studentSub}>
+          Select the Auditorium you are currently seated in to mark your attendance.
         </Text>
       </View>
 
-      {/* Simulator / Hardware Mode Toggle */}
+      {/* Simulator / BLE Toggle */}
       <View style={styles.toggleContainer}>
-        <Text style={styles.toggleLabel}>Presence Verification Mode:</Text>
+        <Text style={styles.toggleLabel}>Verification Engine:</Text>
         <TouchableOpacity
           style={[styles.toggleButton, isSimulator ? styles.toggleActive : styles.toggleInactive]}
           onPress={() => setIsSimulator(!isSimulator)}
@@ -132,65 +179,14 @@ export const MarkAttendanceScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Active Session Card */}
-      {loadingSession ? (
-        <View style={styles.cardCenter}>
-          <ActivityIndicator size="small" color="#2563EB" />
-          <Text style={styles.cardSub}>Checking for active lectures...</Text>
-        </View>
-      ) : !activeSession ? (
-        <View style={styles.cardCenter}>
-          <Text style={styles.cardTitle}>No Active Lecture</Text>
-          <Text style={styles.cardSub}>
-            There are currently no attendance sessions open for your assigned class ({student?.subject || 'Class'}).
-          </Text>
-          <TouchableOpacity style={styles.refreshButton} onPress={fetchSession}>
-            <Text style={styles.refreshText}>Check Again</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.sessionCard}>
-          <View style={styles.activeTag}>
-            <Text style={styles.activeTagText}>ATTENDANCE WINDOW OPEN</Text>
-          </View>
-          <Text style={styles.sessionTitle}>{activeSession.session_name}</Text>
-          <Text style={styles.sessionClass}>
-            {activeSession.class_name} • {activeSession.subject}
-          </Text>
-          <View style={styles.sessionMetaRow}>
-            <Text style={styles.sessionMeta}>Node: {activeSession.device_esp32_id || 'ESP32'}</Text>
-            <Text style={styles.sessionMeta}>Room: {activeSession.classroom_id || '302'}</Text>
-            <Text style={styles.sessionMeta}>
-              Closes: {new Date(activeSession.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Verification State Panel */}
-      {flowState === 'idle' && activeSession && (
-        <View style={styles.actionCard}>
-          <View style={styles.radarIcon}>
-            <Text style={styles.radarEmoji}>📡</Text>
-          </View>
-          <Text style={styles.actionTitle}>Classroom Presence Check</Text>
-          <Text style={styles.actionDesc}>
-            Make sure Bluetooth is enabled and you are inside the classroom near the ESP32 node.
-          </Text>
-
-          <TouchableOpacity style={styles.markButton} onPress={handleMarkAttendance}>
-            <Text style={styles.markButtonText}>Mark Attendance</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
+      {/* Verification In-Progress Card */}
       {(flowState === 'scanning' || flowState === 'handshake' || flowState === 'verifying') && (
         <View style={styles.statusCard}>
           <ActivityIndicator size="large" color="#2563EB" />
           <Text style={styles.statusTitle}>
-            {flowState === 'scanning' && 'Scanning for ESP32...'}
-            {flowState === 'handshake' && 'Cryptographic Handshake...'}
-            {flowState === 'verifying' && 'Validating with Neon DB...'}
+            {flowState === 'scanning' && `Scanning ${activeAudiTarget?.name}...`}
+            {flowState === 'handshake' && 'ESP32 Cryptographic Proof...'}
+            {flowState === 'verifying' && 'Validating with Neon Database...'}
           </Text>
           <Text style={styles.statusDesc}>{verificationFeedback}</Text>
           {detectedBeacon && (
@@ -203,6 +199,7 @@ export const MarkAttendanceScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Verification Success Card */}
       {flowState === 'success' && (
         <View style={[styles.statusCard, styles.successCard]}>
           <Text style={styles.statusEmoji}>✅</Text>
@@ -211,11 +208,11 @@ export const MarkAttendanceScreen: React.FC = () => {
 
           {verificationStats && (
             <View style={styles.statsBox}>
+              <Text style={styles.statItem}>Auditorium: <Text style={styles.statBold}>{verificationStats.auditoriumName}</Text></Text>
+              <Text style={styles.statItem}>Subject: <Text style={styles.statBold}>{verificationStats.subject}</Text></Text>
               <Text style={styles.statItem}>Status: <Text style={styles.statBold}>PRESENT</Text></Text>
-              <Text style={styles.statItem}>Timestamp: <Text style={styles.statBold}>{verificationStats.markedAt}</Text></Text>
-              <Text style={styles.statItem}>Hardware Node: <Text style={styles.statBold}>{verificationStats.esp32Id}</Text></Text>
-              <Text style={styles.statItem}>BLE Signal (RSSI): <Text style={styles.statBold}>{verificationStats.rssi} dBm</Text></Text>
-              <Text style={styles.statItem}>Verification Latency: <Text style={styles.statBold}>{verificationStats.latency} ms</Text></Text>
+              <Text style={styles.statItem}>Time: <Text style={styles.statBold}>{verificationStats.markedAt}</Text></Text>
+              <Text style={styles.statItem}>ESP32 Hardware: <Text style={styles.statBold}>{verificationStats.esp32Id}</Text></Text>
             </View>
           )}
 
@@ -225,10 +222,11 @@ export const MarkAttendanceScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Verification Rejection Card */}
       {flowState === 'rejected' && (
         <View style={[styles.statusCard, styles.rejectedCard]}>
           <Text style={styles.statusEmoji}>❌</Text>
-          <Text style={styles.rejectedTitle}>Attendance Rejected</Text>
+          <Text style={styles.rejectedTitle}>Verification Failed</Text>
           <View style={styles.codePill}>
             <Text style={styles.codeText}>{rejectionCode || 'VERIFICATION_ERROR'}</Text>
           </View>
@@ -238,6 +236,98 @@ export const MarkAttendanceScreen: React.FC = () => {
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* Section Title */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>College Auditoriums (3 Rooms)</Text>
+        <Text style={styles.sectionSub}>Live lectures & presence checkpoints</Text>
+      </View>
+
+      {/* 3 Auditorium Cards */}
+      {loading ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="small" color="#2563EB" />
+          <Text style={styles.loadingText}>Syncing Auditorium Status...</Text>
+        </View>
+      ) : (
+        auditoriums.map((audi) => {
+          const isLive = audi.isLive && !!audi.activeSession;
+          const hasMarked = audi.hasMarkedAttendance;
+
+          return (
+            <View
+              key={audi.id}
+              style={[
+                styles.audiCard,
+                isLive ? (hasMarked ? styles.audiCardMarked : styles.audiCardLive) : styles.audiCardVacant,
+              ]}
+            >
+              {/* Auditorium Card Header */}
+              <View style={styles.audiHeader}>
+                <View style={styles.audiTitleRow}>
+                  <Text style={styles.audiEmoji}>{isLive ? '🏛️' : '🏫'}</Text>
+                  <Text style={styles.audiName}>{audi.name}</Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.badge,
+                    isLive ? (hasMarked ? styles.badgeMarked : styles.badgeLive) : styles.badgeVacant,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.badgeText,
+                      isLive ? (hasMarked ? styles.badgeTextMarked : styles.badgeTextLive) : styles.badgeTextVacant,
+                    ]}
+                  >
+                    {hasMarked ? '✅ ATTENDANCE RECORDED' : isLive ? '🟢 LIVE LECTURE' : '⚪ VACANT'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Lecture Details (if Live) */}
+              {isLive && audi.activeSession && (
+                <View style={styles.lectureBox}>
+                  <Text style={styles.lectureSubject}>{audi.activeSession.subject}</Text>
+                  <Text style={styles.lectureTeacher}>👨‍🏫 Faculty: {audi.activeSession.teacherName}</Text>
+                  <Text style={styles.lectureTime}>
+                    Started at {new Date(audi.activeSession.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+              )}
+
+              {/* No lecture state */}
+              {!isLive && (
+                <View style={styles.vacantBox}>
+                  <Text style={styles.vacantText}>No lecture is currently running in this auditorium.</Text>
+                </View>
+              )}
+
+              {/* Action Button */}
+              {isLive && (
+                <View style={styles.buttonContainer}>
+                  {hasMarked ? (
+                    <View style={styles.markedBanner}>
+                      <Text style={styles.markedBannerText}>✅ You are marked PRESENT in this lecture</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.markAudiButton}
+                      onPress={() => handleMarkAttendance(audi)}
+                      disabled={flowState !== 'idle'}
+                    >
+                      <Text style={styles.markAudiButtonText}>
+                        👉 Mark Attendance in {audi.name}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+          );
+        })
       )}
     </ScrollView>
   );
@@ -556,5 +646,174 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  studentSub: {
+    color: '#BFDBFE',
+    fontSize: 11,
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  sectionHeader: {
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  sectionSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  loadingBox: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 8,
+  },
+  audiCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  audiCardLive: {
+    borderColor: '#3B82F6',
+  },
+  audiCardMarked: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+  audiCardVacant: {
+    borderColor: '#E2E8F0',
+    opacity: 0.85,
+  },
+  audiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  audiTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  audiEmoji: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  audiName: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  badgeLive: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  badgeMarked: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  badgeVacant: {
+    backgroundColor: '#F1F5F9',
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  badgeTextLive: {
+    color: '#1D4ED8',
+  },
+  badgeTextMarked: {
+    color: '#047857',
+  },
+  badgeTextVacant: {
+    color: '#64748B',
+  },
+  lectureBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  lectureSubject: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  lectureTeacher: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  lectureTime: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  vacantBox: {
+    paddingVertical: 10,
+  },
+  vacantText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontStyle: 'italic',
+  },
+  buttonContainer: {
+    marginTop: 4,
+  },
+  markedBanner: {
+    backgroundColor: '#DCFCE7',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  markedBannerText: {
+    color: '#15803D',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  markAudiButton: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  markAudiButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

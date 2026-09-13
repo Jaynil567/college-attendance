@@ -56,14 +56,18 @@ export class BleService {
   /**
    * Scans for Classroom ESP32 presence
    */
-  public static async scanForClassroomEsp32(targetServiceUuid?: string): Promise<BleScanResult> {
+  public static async scanForClassroomEsp32(targetServiceUuid?: string, targetEsp32Id?: string, targetName?: string): Promise<BleScanResult> {
+    const chosenId = targetEsp32Id || 'AUDITORIUM_01';
+    const chosenName = targetName || `ESP32 ${chosenId}`;
+    const chosenUuid = targetServiceUuid || '4fafc201-1fb5-459e-8fcc-c5c9c3319141';
+
     if (this.simulationMode) {
       // Simulate physical BLE radio discovery latency
       await new Promise((resolve) => setTimeout(resolve, 800));
       return {
-        esp32Id: 'CLASSROOM_01',
-        deviceName: 'ESP32 Lab Node 1',
-        serviceUuid: targetServiceUuid || '4fafc201-1fb5-459e-8fcc-c5c9c331914b',
+        esp32Id: chosenId,
+        deviceName: chosenName,
+        serviceUuid: chosenUuid,
         rssi: -62, // Strong in-room signal
         isSimulated: true,
       };
@@ -83,9 +87,9 @@ export class BleService {
           // Fallback to simulated beacon if physical hardware is not detected in 4s
           console.warn('[BLE] Physical ESP32 not detected in 4s, falling back to simulator');
           resolve({
-            esp32Id: 'CLASSROOM_01',
-            deviceName: 'ESP32 Lab Node 1 (Simulated)',
-            serviceUuid: targetServiceUuid || '4fafc201-1fb5-459e-8fcc-c5c9c331914b',
+            esp32Id: chosenId,
+            deviceName: `${chosenName} (Simulated)`,
+            serviceUuid: chosenUuid,
             rssi: -64,
             isSimulated: true,
           });
@@ -102,14 +106,14 @@ export class BleService {
               return;
             }
 
-            if (device && (device.name?.includes('ESP32') || device.name?.includes('Classroom'))) {
+            if (device && (device.name?.includes('ESP32') || device.name?.includes('Classroom') || device.name?.includes('Auditorium'))) {
               clearTimeout(timeout);
               manager.stopDeviceScan();
               manager.destroy();
               resolve({
-                esp32Id: 'CLASSROOM_01',
-                deviceName: device.name || 'ESP32 Node',
-                serviceUuid: targetServiceUuid || '4fafc201-1fb5-459e-8fcc-c5c9c331914b',
+                esp32Id: chosenId,
+                deviceName: device.name || chosenName,
+                serviceUuid: chosenUuid,
                 rssi: device.rssi || -68,
                 isSimulated: false,
               });
@@ -122,9 +126,9 @@ export class BleService {
       console.log('[BLE] Native BLE library unavailable in this environment, using simulator.');
       await new Promise((resolve) => setTimeout(resolve, 900));
       return {
-        esp32Id: 'CLASSROOM_01',
-        deviceName: 'ESP32 Classroom Beacon',
-        serviceUuid: targetServiceUuid || '4fafc201-1fb5-459e-8fcc-c5c9c331914b',
+        esp32Id: chosenId,
+        deviceName: chosenName,
+        serviceUuid: chosenUuid,
         rssi: -63,
         isSimulated: true,
       };
@@ -139,10 +143,19 @@ export class BleService {
     esp32Id: string;
     studentEnrollment: string;
     targetServiceUuid: string;
+    secretKey?: string;
     maxRetries?: number;
   }): Promise<HandshakeResult> {
     const maxRetries = params.maxRetries || 3;
     let attempt = 0;
+
+    const AUDI_SECRETS: Record<string, string> = {
+      AUDITORIUM_01: 'A1B2C3D4E5F601020304050607080910A1B2C3D4E5F601020304050607080911',
+      AUDITORIUM_02: 'A1B2C3D4E5F601020304050607080910A1B2C3D4E5F601020304050607080912',
+      AUDITORIUM_03: 'A1B2C3D4E5F601020304050607080910A1B2C3D4E5F601020304050607080913',
+    };
+
+    const keyToUse = params.secretKey || AUDI_SECRETS[params.esp32Id.toUpperCase()] || this.simulationSecretKey;
 
     while (attempt < maxRetries) {
       attempt++;
@@ -158,7 +171,7 @@ export class BleService {
 
         // Compute HMAC response (in simulation mode or fallback)
         const responseHmac = await this.computeSimulatedHmac(
-          this.simulationSecretKey,
+          keyToUse,
           canonicalPayload
         );
 
@@ -217,7 +230,7 @@ export class BleService {
         const keyBytes = this.hexToBytes(keyHex);
         const cryptoKey = await window.crypto.subtle.importKey(
           'raw',
-          keyBytes,
+          keyBytes as any,
           { name: 'HMAC', hash: 'SHA-256' },
           false,
           ['sign']

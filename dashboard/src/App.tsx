@@ -8,6 +8,7 @@ import { LiveSession } from './pages/LiveSession.js';
 import { Classes } from './pages/Classes.js';
 import { Students } from './pages/Students.js';
 import { Devices } from './pages/Devices.js';
+import { Teachers } from './pages/Teachers.js';
 import { Reports } from './pages/Reports.js';
 import { ApiService } from './services/api.js';
 import { ClassItem, ESP32Device } from './types/index.js';
@@ -15,6 +16,12 @@ import { ClassItem, ESP32Device } from './types/index.js';
 export const AppContent: React.FC = () => {
   const { user, token, isLoading } = useAuth();
   const [currentTab, setCurrentTab] = useState<TabType>('overview');
+
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      setCurrentTab('live');
+    }
+  }, [user]);
 
   // Shared state
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -132,6 +139,10 @@ export const AppContent: React.FC = () => {
               devices={devices}
               onRefresh={loadData}
             />
+          )}
+
+          {currentTab === 'teachers' && (
+            <Teachers onRefresh={loadData} />
           )}
 
           {currentTab === 'reports' && (

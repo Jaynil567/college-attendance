@@ -50,6 +50,7 @@ CREATE TABLE students (
     email VARCHAR(255) UNIQUE,
     phone_number VARCHAR(50),
     password_hash VARCHAR(255) NOT NULL,
+    plain_password VARCHAR(255),                    -- Visible to Admin for student account management
     class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -59,12 +60,12 @@ CREATE TABLE students (
 CREATE INDEX idx_students_enrollment ON students(enrollment_number);
 CREATE INDEX idx_students_class ON students(class_id);
 
--- 4. ESP32 Classroom Attendance Devices
+-- 4. ESP32 Classroom Attendance Devices (3 Fixed Auditoriums)
 CREATE TABLE esp32_devices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    esp32_id VARCHAR(100) UNIQUE NOT NULL,  -- e.g., "CLASSROOM_01"
-    device_name VARCHAR(255) NOT NULL,      -- e.g., "Lab 302 NodeMCU"
-    classroom_id VARCHAR(100) NOT NULL,     -- e.g., "ROOM_302"
+    esp32_id VARCHAR(100) UNIQUE NOT NULL,  -- e.g., "AUDITORIUM_01"
+    device_name VARCHAR(255) NOT NULL,      -- e.g., "Auditorium 1 Presence Node"
+    classroom_id VARCHAR(100) NOT NULL,     -- e.g., "AUDITORIUM_1"
     service_uuid VARCHAR(100) NOT NULL,     -- BLE Service UUID
     char_challenge_uuid VARCHAR(100) NOT NULL, -- BLE Characteristic Challenge UUID
     char_response_uuid VARCHAR(100) NOT NULL,  -- BLE Characteristic Response UUID
@@ -79,14 +80,16 @@ CREATE TABLE esp32_devices (
 CREATE INDEX idx_esp32_id ON esp32_devices(esp32_id);
 CREATE INDEX idx_esp32_classroom ON esp32_devices(classroom_id);
 
--- 5. Attendance Sessions (Teacher starts a session for a class using an ESP32)
+-- 5. Attendance Sessions (Teacher starts a lecture in an Auditorium)
 CREATE TABLE attendance_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
     esp32_id UUID NOT NULL REFERENCES esp32_devices(id) ON DELETE CASCADE,
-    session_name VARCHAR(255) NOT NULL,     -- e.g. "Lecture 14 - Routing Protocols"
+    auditorium_id VARCHAR(50),              -- e.g. "AUDITORIUM_01"
+    auditorium_name VARCHAR(100),           -- e.g. "Auditorium 1"
+    session_name VARCHAR(255) NOT NULL,     -- e.g. "Computer Networks - Routing Protocols"
     start_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE,      -- Nullable: active until closed by teacher
     status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'closed', 'cancelled')),
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -95,13 +98,14 @@ CREATE TABLE attendance_sessions (
 CREATE INDEX idx_sessions_class ON attendance_sessions(class_id);
 CREATE INDEX idx_sessions_esp32 ON attendance_sessions(esp32_id);
 CREATE INDEX idx_sessions_status ON attendance_sessions(status);
+CREATE INDEX idx_sessions_auditorium ON attendance_sessions(auditorium_id);
 
 -- 6. Attendance Records
 CREATE TABLE attendance_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES attendance_sessions(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
     esp32_id UUID NOT NULL REFERENCES esp32_devices(id) ON DELETE CASCADE,
     marked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     status VARCHAR(50) NOT NULL DEFAULT 'present' CHECK (status IN ('present', 'absent', 'late', 'rejected')),

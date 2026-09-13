@@ -5,6 +5,7 @@ import studentRoutes from './studentRoutes.js';
 import deviceRoutes from './deviceRoutes.js';
 import sessionRoutes from './sessionRoutes.js';
 import attendanceRoutes from './attendanceRoutes.js';
+import teacherRoutes from './teacherRoutes.js';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRoutes);
 router.use('/classes', classRoutes);
 router.use('/students', studentRoutes);
+router.use('/teachers', teacherRoutes);
 router.use('/devices', deviceRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/attendance', attendanceRoutes);

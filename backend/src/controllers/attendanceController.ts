@@ -65,7 +65,7 @@ export class AttendanceController {
       const sessionRes = await query(
         `SELECT s.*, c.class_name, c.subject
          FROM attendance_sessions s
-         JOIN classes c ON s.class_id = c.id
+         LEFT JOIN classes c ON s.class_id = c.id
          WHERE s.id = $1`,
         [sessionId]
       );
@@ -86,7 +86,7 @@ export class AttendanceController {
         return;
       }
 
-      if (now > new Date(session.end_time)) {
+      if (session.end_time && now > new Date(session.end_time)) {
         res.status(400).json({
           success: false,
           error: 'SESSION_EXPIRED',
@@ -95,8 +95,8 @@ export class AttendanceController {
         return;
       }
 
-      // 3. Verify Student is Enrolled in the Session's Class
-      if (student.class_id !== session.class_id) {
+      // 3. Verify Student is Enrolled in the Session's Class (if class-specific)
+      if (session.class_id && student.class_id && student.class_id !== session.class_id) {
         res.status(403).json({
           success: false,
           error: 'UNAUTHORIZED_CLASS',
@@ -130,7 +130,7 @@ export class AttendanceController {
       }
 
       // Ensure the device matches the assigned classroom device for this session
-      if (device.id !== session.esp32_id) {
+      if (device.id !== session.esp32_id && device.esp32_id !== session.esp32_id && session.auditorium_id !== device.esp32_id) {
         res.status(400).json({
           success: false,
           error: 'DEVICE_MISMATCH',
@@ -242,13 +242,13 @@ export class AttendanceController {
 
       const recordsRes = await query(
         `SELECT ar.id, ar.marked_at, ar.status, ar.rssi_dbm, ar.rejection_reason,
-                s.session_name, s.start_time, s.end_time,
+                s.session_name, s.auditorium_id, s.auditorium_name, s.start_time, s.end_time,
                 c.class_name, c.subject, c.semester, c.division,
                 d.esp32_id, d.device_name, d.classroom_id
          FROM attendance_records ar
          JOIN attendance_sessions s ON ar.session_id = s.id
-         JOIN classes c ON ar.class_id = c.id
-         JOIN esp32_devices d ON ar.esp32_id = d.id
+         LEFT JOIN classes c ON ar.class_id = c.id
+         LEFT JOIN esp32_devices d ON ar.esp32_id = d.id
          WHERE ar.student_id = $1
          ORDER BY ar.marked_at DESC`,
         [studentId]
@@ -280,21 +280,26 @@ export class AttendanceController {
    */
   static async getAttendanceReport(req: Request, res: Response): Promise<void> {
     try {
-      const { classId, studentId, startDate, endDate, status } = req.query;
+      const { classId, sessionId, studentId, startDate, endDate, status } = req.query;
 
       let sql = `
         SELECT ar.id, ar.marked_at, ar.status, ar.rssi_dbm, ar.rejection_reason,
                st.enrollment_number, st.full_name as student_name,
                c.class_name, c.subject, c.semester, c.division,
-               s.session_name, d.esp32_id, d.classroom_id
+               s.session_name, s.auditorium_name, s.auditorium_id, d.esp32_id, d.classroom_id
         FROM attendance_records ar
         JOIN students st ON ar.student_id = st.id
-        JOIN classes c ON ar.class_id = c.id
+        LEFT JOIN classes c ON ar.class_id = c.id
         JOIN attendance_sessions s ON ar.session_id = s.id
-        JOIN esp32_devices d ON ar.esp32_id = d.id
+        LEFT JOIN esp32_devices d ON ar.esp32_id = d.id
         WHERE 1=1
       `;
       const params: any[] = [];
+
+      if (sessionId && typeof sessionId === 'string') {
+        params.push(sessionId);
+        sql += ` AND ar.session_id = $${params.length}`;
+      }
 
       if (classId && typeof classId === 'string') {
         params.push(classId);
@@ -341,21 +346,26 @@ export class AttendanceController {
    */
   static async exportExcel(req: Request, res: Response): Promise<void> {
     try {
-      const { classId, startDate, endDate } = req.query;
+      const { classId, sessionId, startDate, endDate } = req.query;
 
       let sql = `
         SELECT ar.id, ar.marked_at, ar.status, ar.rssi_dbm,
                st.enrollment_number, st.full_name as student_name,
                c.class_name, c.subject, c.semester, c.division,
-               s.session_name, d.esp32_id
+               s.session_name, s.auditorium_name, d.esp32_id
         FROM attendance_records ar
         JOIN students st ON ar.student_id = st.id
-        JOIN classes c ON ar.class_id = c.id
+        LEFT JOIN classes c ON ar.class_id = c.id
         JOIN attendance_sessions s ON ar.session_id = s.id
-        JOIN esp32_devices d ON ar.esp32_id = d.id
+        LEFT JOIN esp32_devices d ON ar.esp32_id = d.id
         WHERE 1=1
       `;
       const params: any[] = [];
+
+      if (sessionId && typeof sessionId === 'string') {
+        params.push(sessionId);
+        sql += ` AND ar.session_id = $${params.length}`;
+      }
 
       if (classId && typeof classId === 'string') {
         params.push(classId);
@@ -379,10 +389,10 @@ export class AttendanceController {
       const exportRows: AttendanceExportRow[] = (result.rows || []).map((row: any) => ({
         enrollmentNumber: row.enrollment_number,
         studentName: row.student_name,
-        className: row.class_name,
-        subject: row.subject,
-        semester: row.semester,
-        division: row.division,
+        className: row.class_name || row.auditorium_name || 'Auditorium Session',
+        subject: row.subject || row.session_name || 'Lecture',
+        semester: row.semester || 1,
+        division: row.division || 'A',
         sessionName: row.session_name,
         markedAt: row.marked_at,
         status: row.status,
@@ -392,9 +402,9 @@ export class AttendanceController {
 
       const firstRow = result.rows[0];
       const buffer = await ExcelService.generateAttendanceWorkbook({
-        className: firstRow?.class_name,
-        subject: firstRow?.subject,
-        dateRange: startDate && endDate ? `${startDate} to ${endDate}` : 'All Recorded Sessions',
+        className: firstRow?.class_name || firstRow?.auditorium_name || 'Auditorium Attendance',
+        subject: firstRow?.subject || firstRow?.session_name || 'Attendance Log',
+        dateRange: startDate && endDate ? `${startDate} to ${endDate}` : 'Recorded Session',
         records: exportRows,
       });
 

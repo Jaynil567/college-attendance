@@ -23,6 +23,7 @@ export interface Student {
   id: string;
   enrollment_number: string;
   full_name: string;
+  plain_password?: string;
   email: string | null;
   phone_number: string | null;
   class_id: string | null;
@@ -32,6 +33,16 @@ export interface Student {
   division?: string;
   status: 'active' | 'inactive';
   created_at: string;
+}
+
+export interface Teacher {
+  id: string;
+  full_name: string;
+  email: string;
+  phone_number: string | null;
+  role: 'teacher' | 'admin';
+  department?: string;
+  created_at?: string;
 }
 
 export interface ESP32Device {

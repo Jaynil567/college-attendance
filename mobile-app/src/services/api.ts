@@ -34,6 +34,8 @@ export const MobileApiService = {
 
   getActiveSession: () => mobileApi.get('/sessions/active'),
 
+  getAuditoriumsStatus: () => mobileApi.get('/sessions/auditoriums-status'),
+
   markAttendance: (data: {
     sessionId: string;
     esp32Id: string;

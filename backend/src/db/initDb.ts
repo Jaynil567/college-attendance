@@ -189,7 +189,22 @@ export async function seedDatabase(): Promise<void> {
           [teacherUser.id, teacherUser.full_name, teacherUser.email, teacherUser.phone_number, teacherUser.password_hash, teacherUser.role, teacherUser.department]
         );
 
-        console.log('✅ [DB Init] Neon PostgreSQL tables and core staff accounts verified.');
+        // Provision 3 Fixed Auditorium Devices
+        const audiDevices = [
+          { id: 'e1111111-1111-1111-1111-111111111101', esp32_id: 'AUDITORIUM_01', name: 'Auditorium 1 Presence Node', room: 'AUDITORIUM_1', uuid: '4fafc201-1fb5-459e-8fcc-c5c9c3319141', key: 'A1B2C3D4E5F601020304050607080910A1B2C3D4E5F601020304050607080911' },
+          { id: 'e1111111-1111-1111-1111-111111111102', esp32_id: 'AUDITORIUM_02', name: 'Auditorium 2 Presence Node', room: 'AUDITORIUM_2', uuid: '4fafc201-1fb5-459e-8fcc-c5c9c3319142', key: 'A1B2C3D4E5F601020304050607080910A1B2C3D4E5F601020304050607080912' },
+          { id: 'e1111111-1111-1111-1111-111111111103', esp32_id: 'AUDITORIUM_03', name: 'Auditorium 3 Presence Node', room: 'AUDITORIUM_3', uuid: '4fafc201-1fb5-459e-8fcc-c5c9c3319143', key: 'A1B2C3D4E5F601020304050607080910A1B2C3D4E5F601020304050607080913' },
+        ];
+        for (const ad of audiDevices) {
+          await pool.query(
+            `INSERT INTO esp32_devices (id, esp32_id, device_name, classroom_id, service_uuid, char_challenge_uuid, char_response_uuid, secret_key, device_status, firmware_version)
+             VALUES ($1, $2, $3, $4, $5, 'beb5483e-36e1-4688-b7f5-ea07361b26a8', 'beb5483f-36e1-4688-b7f5-ea07361b26a9', $6, 'active', '1.0.0')
+             ON CONFLICT (esp32_id) DO NOTHING`,
+            [ad.id, ad.esp32_id, ad.name, ad.room, ad.uuid, ad.key]
+          );
+        }
+
+        console.log('✅ [DB Init] Neon PostgreSQL tables, core staff accounts, and 3 Auditorium nodes verified.');
       } catch (dbErr: any) {
         console.warn('Notice: Remote Neon initialization notice:', dbErr.message);
       }

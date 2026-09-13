@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../services/api.js';
-import { Users, UserPlus, Search, Filter, Trash2, Edit2, CheckCircle2, XCircle } from 'lucide-react';
+import { Users, UserPlus, Search, Filter, Trash2, Edit2, CheckCircle2, XCircle, Eye, EyeOff, Key } from 'lucide-react';
 import { Modal } from '../components/Modal.js';
 import { Student, ClassItem } from '../types/index.js';
 
@@ -16,6 +16,7 @@ export const Students: React.FC<{
   const [isAddModalOpen, setIsAddModalOpen] = useState(initialAddModalOpen);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentEditStudent, setCurrentEditStudent] = useState<Student | null>(null);
+  const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
 
   // Form fields
   const [enrollmentNumber, setEnrollmentNumber] = useState('');
@@ -92,6 +93,7 @@ export const Students: React.FC<{
         fullName: fullName.trim(),
         email: email.trim() || null,
         phoneNumber: phoneNumber.trim() || null,
+        password: password ? password.trim() : undefined,
         classId: classId || null,
         status,
       });
@@ -112,6 +114,7 @@ export const Students: React.FC<{
     setFullName(student.full_name);
     setEmail(student.email || '');
     setPhoneNumber(student.phone_number || '');
+    setPassword(student.plain_password || '');
     setClassId(student.class_id || '');
     setStatus(student.status);
     setIsEditModalOpen(true);
@@ -212,7 +215,7 @@ export const Students: React.FC<{
                 <tr>
                   <th className="px-6 py-3.5">Enrollment No</th>
                   <th className="px-6 py-3.5">Full Name</th>
-                  <th className="px-6 py-3.5">Assigned Class & Division</th>
+                  <th className="px-6 py-3.5">Password (App Login)</th>
                   <th className="px-6 py-3.5">Email / Phone</th>
                   <th className="px-6 py-3.5">Status</th>
                   <th className="px-6 py-3.5 text-right">Actions</th>
@@ -223,14 +226,20 @@ export const Students: React.FC<{
                   <tr key={st.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-6 py-3.5 font-mono font-bold text-blue-600">{st.enrollment_number}</td>
                     <td className="px-6 py-3.5 font-semibold text-slate-900">{st.full_name}</td>
-                    <td className="px-6 py-3.5 text-xs text-slate-600">
-                      {st.class_name ? (
-                        <span>
-                          <strong>{st.subject}</strong> (Sem {st.semester}-{st.division})
+                    <td className="px-6 py-3.5">
+                      <div className="inline-flex items-center space-x-2 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                        <span className="font-mono text-xs font-semibold text-slate-800">
+                          {showPasswordMap[st.id] ? (st.plain_password || 'student123') : '••••••••'}
                         </span>
-                      ) : (
-                        <span className="text-slate-400 italic">Unassigned</span>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswordMap((prev) => ({ ...prev, [st.id]: !prev[st.id] }))}
+                          className="text-slate-400 hover:text-blue-600 transition-colors"
+                          title={showPasswordMap[st.id] ? 'Hide password' : 'Show password'}
+                        >
+                          {showPasswordMap[st.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-6 py-3.5 text-xs text-slate-500">
                       <div>{st.email || 'No email'}</div>
@@ -253,12 +262,14 @@ export const Students: React.FC<{
                       <button
                         onClick={() => openEditModal(st)}
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Student"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(st.id, st.full_name)}
                         className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Student"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -416,6 +427,21 @@ export const Students: React.FC<{
               onChange={(e) => setFullName(e.target.value)}
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+              Password (App Login)
+            </label>
+            <input
+              type="text"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="e.g. student123"
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">Student uses this password to log in to the mobile app.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

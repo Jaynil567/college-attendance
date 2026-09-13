@@ -75,4 +75,6 @@ export function requireRole(allowedRoles: Array<'admin' | 'teacher' | 'student'>
 }
 
 export const requireTeacherOrAdmin = requireRole(['admin', 'teacher']);
+export const requireAdmin = requireRole(['admin']);
 export const requireStudent = requireRole(['student']);
+export const requireAuth = authenticateToken;

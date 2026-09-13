@@ -42,23 +42,31 @@ export const ApiService = {
   updateStudent: (id: string, data: any) => api.put(`/students/${id}`, data),
   deleteStudent: (id: string) => api.delete(`/students/${id}`),
 
+  // Teachers (Admin only)
+  getTeachers: () => api.get('/teachers'),
+  createTeacher: (data: any) => api.post('/teachers', data),
+  updateTeacher: (id: string, data: any) => api.put(`/teachers/${id}`, data),
+  deleteTeacher: (id: string) => api.delete(`/teachers/${id}`),
+
   // Devices
   getDevices: () => api.get('/devices'),
   registerDevice: (data: any) => api.post('/devices', data),
   rotateDeviceKey: (id: string) => api.put(`/devices/${id}/rotate-key`),
 
   // Sessions
+  getAuditoriumsStatus: () => api.get('/sessions/auditoriums-status'),
   getActiveSessions: () => api.get('/sessions/active'),
   getSessionById: (id: string) => api.get(`/sessions/${id}`),
-  startSession: (data: { classId: string; esp32Id: string; sessionName: string; durationMinutes: number }) =>
+  startSession: (data: { auditoriumId?: string; subject?: string; classId?: string; esp32Id?: string; sessionName?: string; durationMinutes?: number }) =>
     api.post('/sessions/start', data),
   closeSession: (id: string) => api.post(`/sessions/${id}/close`),
+  endSession: (id: string) => api.post(`/sessions/${id}/end`),
 
   // Attendance Reports & Export
-  getAttendanceReport: (params?: { classId?: string; studentId?: string; startDate?: string; endDate?: string; status?: string }) =>
+  getAttendanceReport: (params?: { classId?: string; sessionId?: string; studentId?: string; startDate?: string; endDate?: string; status?: string }) =>
     api.get('/attendance/report', { params }),
   
-  exportExcel: async (params?: { classId?: string; startDate?: string; endDate?: string }) => {
+  exportExcel: async (params?: { classId?: string; sessionId?: string; startDate?: string; endDate?: string }) => {
     const response = await api.get('/attendance/export', {
       params,
       responseType: 'blob',
