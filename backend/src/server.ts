@@ -30,7 +30,7 @@ const apiLimiter = rateLimit({
     message: 'Too many requests from this network. Please wait a few moments.',
   },
 });
-app.use('/api', apiLimiter);
+app.use(apiLimiter);
 
 // 3. Mount API Router & Root Status
 app.get('/', (req, res) => {
@@ -50,7 +50,9 @@ app.get('/', (req, res) => {
   });
 });
 
+// Support both /api/* and /* paths so clients without /api prefix work seamlessly
 app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 // 4. Fallback 404 Handler
 app.use((req, res) => {
