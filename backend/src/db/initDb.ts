@@ -151,12 +151,12 @@ export async function seedDatabase(): Promise<void> {
       created_at: new Date(),
     };
 
-    // Populate In-Memory store
+    // Clean In-Memory store for production
     mockStore.users = [adminUser, teacherUser];
-    mockStore.classes = [sampleClass];
-    mockStore.students = sampleStudents;
-    mockStore.esp32_devices = [sampleDevice];
-    mockStore.attendance_sessions = [sampleSession];
+    mockStore.classes = [];
+    mockStore.students = [];
+    mockStore.esp32_devices = [];
+    mockStore.attendance_sessions = [];
     mockStore.attendance_records = [];
     mockStore.challenge_nonces = [];
 

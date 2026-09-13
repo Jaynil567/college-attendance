@@ -27,7 +27,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const res = await ApiService.getMe();
         if (res.data.success && res.data.user) {
-          setUser(res.data.user);
+          const raw = res.data.user;
+          setUser({
+            ...raw,
+            fullName: raw.fullName || raw.full_name || 'Staff User',
+          });
         } else {
           logout();
         }
@@ -41,10 +45,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  const login = (newToken: string, newUser: any) => {
     localStorage.setItem('attendance_teacher_token', newToken);
     setToken(newToken);
-    setUser(newUser);
+    setUser({
+      ...newUser,
+      fullName: newUser.fullName || newUser.full_name || 'Staff User',
+    });
   };
 
   const logout = () => {

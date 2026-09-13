@@ -196,7 +196,24 @@ export class AuthController {
          FROM users WHERE id = $1`,
         [req.user.id]
       );
-      res.status(200).json({ success: true, user: result.rows[0], role: req.user.role });
+      if (!result.rows || result.rows.length === 0) {
+        res.status(404).json({ success: false, error: 'USER_NOT_FOUND' });
+        return;
+      }
+      const u = result.rows[0];
+      res.status(200).json({
+        success: true,
+        user: {
+          id: u.id,
+          fullName: u.full_name,
+          full_name: u.full_name,
+          email: u.email,
+          phoneNumber: u.phone_number,
+          role: u.role,
+          department: u.department,
+        },
+        role: req.user.role,
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
     }

@@ -35,19 +35,19 @@ export const Navbar: React.FC<{ activeSessionCount: number }> = ({ activeSession
           {/* User Profile Pill */}
           <div className="flex items-center space-x-3 pl-2 border-l border-slate-200">
             <div className="text-right hidden md:block">
-              <p className="text-sm font-semibold text-slate-800">{user?.fullName}</p>
+              <p className="text-sm font-semibold text-slate-800">{user?.fullName || (user as any)?.full_name || 'Staff'}</p>
               <div className="flex items-center justify-end space-x-1">
                 <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
                   user?.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
                 }`}>
-                  {user?.role}
+                  {user?.role || 'User'}
                 </span>
-                <span className="text-xs text-slate-400">{user?.department}</span>
+                <span className="text-xs text-slate-400">{user?.department || 'College Faculty'}</span>
               </div>
             </div>
 
             <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-semibold text-sm">
-              {user?.fullName.charAt(0) || <User className="w-4 h-4" />}
+              {(user?.fullName || (user as any)?.full_name || 'U').charAt(0).toUpperCase()}
             </div>
 
             <button
