@@ -277,6 +277,38 @@ export class StudentController {
   }
 
   /**
+   * Reset all student passwords to random 4-digit codes
+   */
+  static async resetAllPasswords(req: Request, res: Response): Promise<void> {
+    try {
+      const students = await query(
+        'SELECT id FROM students WHERE status = $1',
+        ['active']
+      );
+
+      let count = 0;
+      for (const student of students.rows) {
+        const newPassword = String(Math.floor(1000 + Math.random() * 9000)); // 4-digit: 1000-9999
+        const hash = await bcrypt.hash(newPassword, 10);
+        await query(
+          'UPDATE students SET password_hash = $1, plain_password = $2, updated_at = NOW() WHERE id = $3',
+          [hash, newPassword, student.id]
+        );
+        count++;
+      }
+
+      res.json({
+        success: true,
+        message: `Passwords reset for ${count} students`,
+        count,
+      });
+    } catch (err: any) {
+      console.error('[StudentController.resetAllPasswords]', err);
+      res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+
+  /**
    * Export all student credentials to an Excel file
    */
   static async exportCredentials(req: Request, res: Response): Promise<void> {
