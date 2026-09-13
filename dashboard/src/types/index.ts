@@ -32,6 +32,7 @@ export interface Student {
   semester?: string;
   division?: string;
   status: 'active' | 'inactive';
+  device_id?: string | null;
   created_at: string;
 }
 

@@ -27,8 +27,8 @@ export const setApiBaseUrl = (newUrl: string) => {
 };
 
 export const MobileApiService = {
-  login: (enrollmentNumber: string, password: string) =>
-    mobileApi.post('/auth/student/login', { enrollmentNumber, password }),
+  login: (enrollmentNumber: string, password: string, deviceFingerprint?: string) =>
+    mobileApi.post('/auth/student/login', { enrollmentNumber, password, deviceFingerprint }),
 
   getMe: () => mobileApi.get('/auth/me'),
 
@@ -38,12 +38,10 @@ export const MobileApiService = {
 
   markAttendance: (data: {
     sessionId: string;
-    esp32Id: string;
-    challenge: string;
-    response: string;
-    timestamp: number;
-    rssi: number;
-    deviceInfo?: string;
+    deviceFingerprint: string;
+    biometricVerified: boolean;
+    bleRssi?: number;
+    bleDeviceName?: string;
   }) => mobileApi.post('/attendance/mark', data),
 
   getHistory: () => mobileApi.get('/attendance/history'),

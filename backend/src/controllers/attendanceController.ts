@@ -2,17 +2,14 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { query } from '../config/db.js';
-import { CryptoService } from '../services/cryptoService.js';
 import { ExcelService, AttendanceExportRow } from '../services/excelService.js';
 
 const markAttendanceSchema = z.object({
   sessionId: z.string().uuid('Valid Session ID is required'),
-  esp32Id: z.string().min(2, 'ESP32 Device ID is required'),
-  challenge: z.string().min(32, 'Valid challenge nonce is required'),
-  response: z.string().min(64, 'Cryptographic response is required'),
-  timestamp: z.number().int().positive('Valid timestamp is required'),
-  rssi: z.number().int().default(-65),
-  deviceInfo: z.string().optional().default('Mobile App'),
+  deviceFingerprint: z.string().min(5, 'Device fingerprint is required'),
+  biometricVerified: z.boolean(),
+  bleRssi: z.number().int().optional().default(-65),
+  bleDeviceName: z.string().optional().default('Teacher Phone'),
 });
 
 export class AttendanceController {
@@ -42,7 +39,7 @@ export class AttendanceController {
         return;
       }
 
-      const { sessionId, esp32Id, challenge, response, timestamp, rssi, deviceInfo } = parsed.data;
+      const { sessionId, deviceFingerprint, biometricVerified, bleRssi, bleDeviceName } = parsed.data;
 
       // 1. Fetch Student Details
       const studentRes = await query('SELECT * FROM students WHERE id = $1', [studentId]);
@@ -57,6 +54,24 @@ export class AttendanceController {
           success: false,
           error: 'STUDENT_INACTIVE',
           message: 'Student account is inactive. Attendance cannot be recorded.',
+        });
+        return;
+      }
+
+      if (!biometricVerified) {
+        res.status(403).json({
+          success: false,
+          error: 'BIOMETRIC_REQUIRED',
+          message: 'Fingerprint/Face ID verification is required',
+        });
+        return;
+      }
+
+      if (student.device_id && student.device_id !== deviceFingerprint) {
+        res.status(403).json({
+          success: false,
+          error: 'DEVICE_MISMATCH',
+          message: 'This account is bound to another device. Contact your teacher to reset.',
         });
         return;
       }
@@ -105,41 +120,7 @@ export class AttendanceController {
         return;
       }
 
-      // 4. Fetch ESP32 Device Cryptographic Credentials
-      const deviceRes = await query(
-        'SELECT * FROM esp32_devices WHERE id = $1 OR UPPER(esp32_id) = $2',
-        [session.esp32_id, esp32Id.toUpperCase()]
-      );
-      if (!deviceRes.rows || deviceRes.rows.length === 0) {
-        res.status(404).json({
-          success: false,
-          error: 'DEVICE_NOT_FOUND',
-          message: 'Classroom ESP32 device is not registered in the system.',
-        });
-        return;
-      }
-      const device = deviceRes.rows[0];
-
-      if (device.device_status !== 'active') {
-        res.status(403).json({
-          success: false,
-          error: 'DEVICE_INACTIVE',
-          message: `Classroom ESP32 device '${device.device_name}' is currently offline/disabled.`,
-        });
-        return;
-      }
-
-      // Ensure the device matches the assigned classroom device for this session
-      if (device.id !== session.esp32_id && device.esp32_id !== session.esp32_id && session.auditorium_id !== device.esp32_id) {
-        res.status(400).json({
-          success: false,
-          error: 'DEVICE_MISMATCH',
-          message: 'Scanned ESP32 does not match the designated device for this attendance session.',
-        });
-        return;
-      }
-
-      // 5. Check If Student Has Already Marked Attendance for this Session
+      // 4. Check If Student Has Already Marked Attendance for this Session
       const duplicateRes = await query(
         'SELECT id, status, marked_at FROM attendance_records WHERE session_id = $1 AND student_id = $2',
         [sessionId, studentId]
@@ -156,53 +137,10 @@ export class AttendanceController {
         }
       }
 
-      // 6. Execute Full Cryptographic Verification Pipeline
-      const proofResult = await CryptoService.verifyAttendanceProof({
-        studentId: student.id,
-        studentEnrollment: student.enrollment_number,
-        esp32Id: device.esp32_id,
-        esp32SecretKeyHex: device.secret_key,
-        challenge,
-        signature: response,
-        timestamp,
-        rssi,
-      });
-
       const latencyMs = Date.now() - startTime;
       const clientIp = req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || '127.0.0.1';
 
-      if (!proofResult.isValid) {
-        // Record rejected attempt in audit log
-        const rejectedId = crypto.randomUUID();
-        await query(
-          `INSERT INTO attendance_records (
-            id, session_id, student_id, class_id, esp32_id, marked_at,
-            status, rejection_reason, verification_nonce, rssi_dbm, verification_latency_ms, ip_address, device_info, created_at
-          ) VALUES ($1, $2, $3, $4, $5, NOW(), 'rejected', $6, $7, $8, $9, $10, $11, NOW())`,
-          [
-            rejectedId,
-            sessionId,
-            studentId,
-            session.class_id,
-            device.id,
-            proofResult.errorMessage || 'Verification failed',
-            challenge,
-            rssi,
-            latencyMs,
-            clientIp,
-            deviceInfo,
-          ]
-        );
-
-        res.status(400).json({
-          success: false,
-          error: proofResult.errorCode || 'VERIFICATION_FAILED',
-          message: proofResult.errorMessage || 'Attendance verification failed.',
-        });
-        return;
-      }
-
-      // 7. Verification Successful! Insert Attendance Record
+      // 5. Verification Successful! Insert Attendance Record
       const recordId = crypto.randomUUID();
       const insertRes = await query(
         `INSERT INTO attendance_records (
@@ -210,7 +148,7 @@ export class AttendanceController {
           status, rejection_reason, verification_nonce, rssi_dbm, verification_latency_ms, ip_address, device_info, created_at
         ) VALUES ($1, $2, $3, $4, $5, NOW(), 'present', NULL, $6, $7, $8, $9, $10, NOW())
         RETURNING *`,
-        [recordId, sessionId, studentId, session.class_id, device.id, challenge, rssi, latencyMs, clientIp, deviceInfo]
+        [recordId, sessionId, studentId, session.class_id, session.esp32_id, null, bleRssi, latencyMs, clientIp, deviceFingerprint]
       );
 
       res.status(200).json({

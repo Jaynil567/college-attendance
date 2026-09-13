@@ -13,6 +13,7 @@ const teacherLoginSchema = z.object({
 const studentLoginSchema = z.object({
   enrollmentNumber: z.string().min(3, 'Enrollment number is required'),
   password: z.string().min(4, 'Password must be at least 4 characters'),
+  deviceFingerprint: z.string().min(5).optional(),
 });
 
 export class AuthController {
@@ -135,6 +136,21 @@ export class AuthController {
         return;
       }
 
+      const deviceFingerprint = parsed.data.deviceFingerprint;
+      if (deviceFingerprint) {
+        if (!student.device_id) {
+          await query('UPDATE students SET device_id = $1 WHERE id = $2', [deviceFingerprint, student.id]);
+          student.device_id = deviceFingerprint;
+        } else if (student.device_id !== deviceFingerprint) {
+          res.status(403).json({
+            success: false,
+            error: 'DEVICE_MISMATCH',
+            message: 'This account is bound to another device. Contact your teacher to reset.',
+          });
+          return;
+        }
+      }
+
       const token = generateToken({
         id: student.id,
         enrollmentNumber: student.enrollment_number,
@@ -159,6 +175,7 @@ export class AuthController {
           semester: student.semester,
           division: student.division,
           status: student.status,
+          deviceBound: !!student.device_id,
         },
       });
     } catch (err: any) {

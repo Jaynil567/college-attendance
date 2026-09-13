@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ApiService } from '../services/api.js';
-import { Users, UserPlus, Search, Filter, Trash2, Edit2, CheckCircle2, XCircle, Eye, EyeOff, Key } from 'lucide-react';
+import { ApiService, api } from '../services/api.js';
+import { Users, UserPlus, Search, Filter, Trash2, Edit2, CheckCircle2, XCircle, Eye, EyeOff, Key, Download, RefreshCw, Smartphone } from 'lucide-react';
 import { Modal } from '../components/Modal.js';
 import { Student, ClassItem } from '../types/index.js';
 
@@ -17,6 +17,7 @@ export const Students: React.FC<{
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentEditStudent, setCurrentEditStudent] = useState<Student | null>(null);
   const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
+  const [resettingPasswords, setResettingPasswords] = useState(false);
 
   // Form fields
   const [enrollmentNumber, setEnrollmentNumber] = useState('');
@@ -132,6 +133,51 @@ export const Students: React.FC<{
     }
   };
 
+  const handleDownloadCredentials = async () => {
+    try {
+      const response = await api.get('/students/export-credentials', {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Student_Credentials_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to download credentials');
+    }
+  };
+
+  const handleResetAllPasswords = async () => {
+    if (!window.confirm('⚠️ This will generate new random 4-digit passwords for ALL students. Students who are already logged in will NOT be affected (their sessions stay active). Continue?')) return;
+    setResettingPasswords(true);
+    try {
+      const res = await api.post('/students/reset-all-passwords');
+      if (res.data.success) {
+        alert(`✅ Passwords reset for ${res.data.count} students. Download the credentials sheet to see new passwords.`);
+        fetchStudents(); // Refresh to show new passwords
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reset passwords');
+    } finally {
+      setResettingPasswords(false);
+    }
+  };
+
+  const handleResetDevice = async (studentId: string, studentName: string) => {
+    if (!window.confirm(`Reset device binding for '${studentName}'? They will need to login again from their new phone.`)) return;
+    try {
+      await ApiService.updateStudent(studentId, { device_id: null } as any);
+      alert(`✅ Device reset for ${studentName}. They can now login from a new phone.`);
+      fetchStudents();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reset device');
+    }
+  };
+
   const resetForm = () => {
     setEnrollmentNumber('');
     setFullName('');
@@ -155,16 +201,35 @@ export const Students: React.FC<{
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsAddModalOpen(true);
-          }}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Register Student</span>
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleDownloadCredentials}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download Credentials</span>
+          </button>
+          
+          <button
+            onClick={handleResetAllPasswords}
+            disabled={resettingPasswords}
+            className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${resettingPasswords ? 'animate-spin' : ''}`} />
+            <span>{resettingPasswords ? 'Resetting...' : 'Reset All Passwords'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              resetForm();
+              setIsAddModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Register Student</span>
+          </button>
+        </div>
       </div>
 
       {/* Search & Class Filters */}
@@ -218,6 +283,7 @@ export const Students: React.FC<{
                   <th className="px-6 py-3.5">Password (App Login)</th>
                   <th className="px-6 py-3.5">Email / Phone</th>
                   <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">Device</th>
                   <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -258,7 +324,26 @@ export const Students: React.FC<{
                         </span>
                       )}
                     </td>
+                    <td className="px-6 py-3.5">
+                      {st.device_id ? (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                          <Smartphone className="w-3 h-3" />
+                          <span>Bound</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">Not bound</span>
+                      )}
+                    </td>
                     <td className="px-6 py-3.5 text-right space-x-2">
+                      {st.device_id && (
+                        <button
+                          onClick={() => handleResetDevice(st.id, st.full_name)}
+                          className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                          title="Reset Device Binding"
+                        >
+                          <Smartphone className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => openEditModal(st)}
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

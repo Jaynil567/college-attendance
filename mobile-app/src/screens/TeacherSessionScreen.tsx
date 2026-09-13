@@ -12,12 +12,20 @@ import {
 } from 'react-native';
 import { useMobileAuth } from '../context/AuthContext';
 import { MobileApiService } from '../services/api';
+import { BleService } from '../services/bleService';
 
 const AUDITORIUM_OPTIONS = [
   { id: 'AUDITORIUM_01', name: 'Engineering Auditorium', icon: '⚙️' },
   { id: 'AUDITORIUM_02', name: 'Architecture Auditorium', icon: '🏛️' },
   { id: 'AUDITORIUM_03', name: 'LAW Auditorium', icon: '⚖️' },
 ];
+
+// BLE Service UUIDs for each auditorium beacon
+const AUDITORIUM_BLE_UUIDS: Record<string, string> = {
+  AUDITORIUM_01: '4fafc201-1fb5-459e-8fcc-c5c9c3319141',
+  AUDITORIUM_02: '4fafc201-1fb5-459e-8fcc-c5c9c3319142',
+  AUDITORIUM_03: '4fafc201-1fb5-459e-8fcc-c5c9c3319143',
+};
 
 export const TeacherSessionScreen: React.FC = () => {
   const { teacher, logout } = useMobileAuth();
@@ -30,6 +38,7 @@ export const TeacherSessionScreen: React.FC = () => {
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [bleActive, setBleActive] = useState(false);
 
   const timerRef = useRef<any>(null);
   const pollRef = useRef<any>(null);
@@ -104,6 +113,8 @@ export const TeacherSessionScreen: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollRef.current) clearInterval(pollRef.current);
+      // Stop BLE advertising when component unmounts
+      BleService.stopAdvertising();
     };
   }, [activeSession?.id]);
 
@@ -135,6 +146,17 @@ export const TeacherSessionScreen: React.FC = () => {
         setActiveSession(res.data.session);
         setSessionRecords([]);
         setElapsedSeconds(0);
+
+        // Start BLE beacon broadcasting for this auditorium
+        const bleUuid = AUDITORIUM_BLE_UUIDS[selectedAudiId];
+        if (bleUuid) {
+          const bleStarted = await BleService.startAdvertising(bleUuid);
+          setBleActive(bleStarted);
+          if (!bleStarted) {
+            Alert.alert('BLE Warning', 'Could not start BLE beacon. Students may not be able to verify proximity. Make sure Bluetooth is enabled.');
+          }
+        }
+
         await checkStatus();
       } else {
         Alert.alert('Error', res.data.message || 'Could not start attendance session.');
@@ -162,6 +184,11 @@ export const TeacherSessionScreen: React.FC = () => {
             setEnding(true);
             try {
               await MobileApiService.endSession(activeSession.id);
+
+              // Stop BLE beacon broadcasting
+              await BleService.stopAdvertising();
+              setBleActive(false);
+
               Alert.alert(
                 'Attendance Completed',
                 `Attendance recorded for ${sessionRecords.length} students in ${activeSession.sessionName || subjectTitle}.`
@@ -247,6 +274,22 @@ export const TeacherSessionScreen: React.FC = () => {
             <Text style={styles.broadcastTip}>
               Keep this screen active while students in {selectedAudiObj?.name} tap "Mark Attendance" on their phones.
             </Text>
+
+            {/* BLE Beacon Status */}
+            <View style={[styles.bleBadge, bleActive ? styles.bleBadgeActive : styles.bleBadgeInactive]}>
+              <Text style={styles.bleBadgeIcon}>{bleActive ? '📡' : '⚠️'}</Text>
+              <View style={styles.bleBadgeInfo}>
+                <Text style={[styles.bleBadgeTitle, bleActive ? styles.bleBadgeTitleActive : styles.bleBadgeTitleInactive]}>
+                  {bleActive ? 'BLE Beacon Broadcasting' : 'BLE Beacon Inactive'}
+                </Text>
+                <Text style={styles.bleBadgeDesc}>
+                  {bleActive
+                    ? 'Students can detect your phone for attendance verification'
+                    : 'Bluetooth may be disabled. Students cannot verify proximity.'}
+                </Text>
+              </View>
+              {bleActive && <View style={styles.blePulseDot} />}
+            </View>
 
             {/* Real-Time Attendance Stream List */}
             <View style={styles.liveListContainer}>
@@ -702,5 +745,34 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  // BLE Beacon Status Badge
+  bleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+  },
+  bleBadgeActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  bleBadgeInactive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  bleBadgeIcon: { fontSize: 20, marginRight: 10 },
+  bleBadgeInfo: { flex: 1 },
+  bleBadgeTitle: { fontSize: 12, fontWeight: '800' },
+  bleBadgeTitleActive: { color: '#065F46' },
+  bleBadgeTitleInactive: { color: '#991B1B' },
+  bleBadgeDesc: { fontSize: 10, color: '#64748B', marginTop: 2 },
+  blePulseDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#22C55E',
   },
 });

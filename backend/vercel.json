@@ -5,5 +5,11 @@
       "source": "/(.*)",
       "destination": "/api"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/rotate-passwords",
+      "schedule": "30 18 * * *"
+    }
   ]
 }

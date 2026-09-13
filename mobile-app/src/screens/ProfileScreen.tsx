@@ -73,9 +73,22 @@ export const ProfileScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <Text style={styles.logoutText}>Sign Out of Student Portal</Text>
-      </TouchableOpacity>
+      {/* Security Info (no logout for students) */}
+      <View style={styles.infoCard}>
+        <Text style={styles.cardHeader}>🔒 SECURITY</Text>
+        <View style={styles.row}>
+          <Text style={styles.label}>Device Binding</Text>
+          <Text style={[styles.val, styles.activeVal]}>LOCKED ✅</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Biometric</Text>
+          <Text style={[styles.val, styles.activeVal]}>REQUIRED</Text>
+        </View>
+        <View style={[styles.row, styles.noBorder]}>
+          <Text style={styles.label}>BLE Proximity</Text>
+          <Text style={[styles.val, styles.activeVal]}>REQUIRED</Text>
+        </View>
+      </View>
     </ScrollView>
   );
 };

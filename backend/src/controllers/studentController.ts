@@ -252,4 +252,68 @@ export class StudentController {
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
     }
   }
+
+  /**
+   * Reset all student passwords to a random 4-digit code
+   */
+  static async resetAllPasswords(req: Request, res: Response): Promise<void> {
+    try {
+      const students = await query('SELECT id FROM students WHERE status = $1', ['active']);
+      let count = 0;
+      for (const student of students.rows) {
+        const newPassword = String(Math.floor(1000 + Math.random() * 9000));
+        const hash = await bcrypt.hash(newPassword, 10);
+        await query(
+          'UPDATE students SET password_hash = $1, plain_password = $2, updated_at = NOW() WHERE id = $3',
+          [hash, newPassword, student.id]
+        );
+        count++;
+      }
+      res.status(200).json({ success: true, count });
+    } catch (err: any) {
+      console.error('[StudentController.resetAllPasswords]', err);
+      res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+
+  /**
+   * Export all student credentials to an Excel file
+   */
+  static async exportCredentials(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await query(
+        'SELECT enrollment_number, full_name, plain_password FROM students ORDER BY enrollment_number ASC'
+      );
+
+      const ExcelJS = (await import('exceljs')).default;
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Credentials');
+
+      worksheet.columns = [
+        { header: 'Sr. No', key: 'srNo', width: 10 },
+        { header: 'Enrollment Number', key: 'enrollment', width: 25 },
+        { header: 'Student Name', key: 'name', width: 30 },
+        { header: 'Password', key: 'password', width: 15 },
+      ];
+
+      result.rows.forEach((student: any, index: number) => {
+        worksheet.addRow({
+          srNo: index + 1,
+          enrollment: student.enrollment_number,
+          name: student.full_name,
+          password: student.plain_password,
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = `Student_Credentials_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (err: any) {
+      console.error('[StudentController.exportCredentials]', err);
+      res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
+    }
+  }
 }
