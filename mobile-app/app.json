@@ -29,10 +29,17 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": false,
-          "modes": ["central"],
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "Allow College Attendance to scan for classroom presence beacons."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0a32d3b1-70c6-46c3-834c-abb92e27f80c"
+      }
+    }
   }
 }
