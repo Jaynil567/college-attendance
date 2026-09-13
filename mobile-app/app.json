@@ -34,8 +34,7 @@
         {
           "isBackgroundEnabled": false,
           "modes": [
-            "central",
-            "peripheral"
+            "central"
           ],
           "bluetoothAlwaysPermission": "Allow College Attendance to scan for classroom presence beacons."
         }
