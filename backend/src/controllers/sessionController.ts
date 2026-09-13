@@ -101,7 +101,7 @@ export class SessionController {
                 d.service_uuid, d.char_challenge_uuid, d.char_response_uuid
          FROM attendance_sessions s
          LEFT JOIN classes c ON s.class_id = c.id
-         LEFT JOIN teachers t ON s.created_by = t.id
+         LEFT JOIN users t ON s.created_by = t.id
          LEFT JOIN esp32_devices d ON s.esp32_id = d.id
          WHERE s.id = $1`,
         [sessionId]
@@ -169,7 +169,7 @@ export class SessionController {
                 t.full_name as teacher_name,
                 COUNT(ar.id)::int as present_count
          FROM attendance_sessions s
-         LEFT JOIN teachers t ON s.created_by = t.id
+         LEFT JOIN users t ON s.created_by = t.id
          LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.status = 'present'
          WHERE s.status = 'active'
          GROUP BY s.id, t.full_name`
@@ -233,7 +233,7 @@ export class SessionController {
                COUNT(ar.id)::int as present_count
         FROM attendance_sessions s
         LEFT JOIN classes c ON s.class_id = c.id
-        LEFT JOIN teachers t ON s.created_by = t.id
+        LEFT JOIN users t ON s.created_by = t.id
         LEFT JOIN esp32_devices d ON (s.esp32_id = d.id OR s.auditorium_id = d.esp32_id)
         LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.status = 'present'
         WHERE s.status = 'active'
@@ -275,7 +275,7 @@ export class SessionController {
                 d.service_uuid, d.char_challenge_uuid, d.char_response_uuid
          FROM attendance_sessions s
          LEFT JOIN classes c ON s.class_id = c.id
-         LEFT JOIN teachers t ON s.created_by = t.id
+         LEFT JOIN users t ON s.created_by = t.id
          LEFT JOIN esp32_devices d ON (s.esp32_id = d.id OR s.auditorium_id = d.esp32_id)
          WHERE s.id = $1`,
         [id]
