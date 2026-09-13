@@ -35,16 +35,16 @@ export function getDbPool(): pg.Pool | null {
         ssl: {
           rejectUnauthorized: false, // Required for Neon PostgreSQL serverless connections
         },
-        max: 20, // Connection pool size optimized for concurrent student check-ins
+        max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
+        connectionTimeoutMillis: 15000,
       });
 
       pool.on('error', (err) => {
         console.error('Unexpected error on idle Neon DB client', err);
       });
     } catch (err) {
-      console.warn('Could not initialize PostgreSQL Pool, falling back to local store', err);
+      console.warn('Could not initialize PostgreSQL Pool', err);
       pool = null;
     }
   }
@@ -54,8 +54,7 @@ export function getDbPool(): pg.Pool | null {
 export async function testDbConnection(): Promise<boolean> {
   const p = getDbPool();
   if (!p) {
-    console.log('[DB] Using local resilient data store (Neon connection string not yet configured)');
-    isMockDb = true;
+    console.log('[DB] No database pool available');
     return false;
   }
   try {
@@ -63,19 +62,16 @@ export async function testDbConnection(): Promise<boolean> {
     const res = await client.query('SELECT NOW() as current_time');
     client.release();
     console.log('[DB] Successfully connected to Neon PostgreSQL! Time:', res.rows[0].current_time);
-    isMockDb = false;
     return true;
   } catch (err: any) {
     console.warn('[DB] Neon PostgreSQL connection attempt failed:', err.message);
-    console.log('[DB] Activating local fallback data layer so all API endpoints function seamlessly.');
-    isMockDb = true;
     return false;
   }
 }
 
 export async function query(text: string, params?: any[]): Promise<any> {
   const p = getDbPool();
-  if (p && !isMockDb) {
+  if (p) {
     try {
       return await p.query(text, params);
     } catch (err: any) {
@@ -84,7 +80,7 @@ export async function query(text: string, params?: any[]): Promise<any> {
     }
   }
 
-  // Resilient memory query handler for development/testing
+  // Fallback only if database pool is completely unavailable
   return executeMockQuery(text, params || []);
 }
 
