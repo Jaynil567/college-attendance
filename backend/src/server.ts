@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import rateLimit from 'express-rate-limit';
+import { rateLimit } from 'express-rate-limit';
 import { ENV } from './config/env.js';
 import { testDbConnection } from './config/db.js';
 import apiRouter from './routes/index.js';
@@ -32,7 +32,24 @@ const apiLimiter = rateLimit({
 });
 app.use('/api', apiLimiter);
 
-// 3. Mount API Router
+// 3. Mount API Router & Root Status
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    service: 'College Classroom Attendance System API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      classes: '/api/classes',
+      students: '/api/students',
+      sessions: '/api/sessions',
+      attendance: '/api/attendance',
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use('/api', apiRouter);
 
 // 4. Fallback 404 Handler
@@ -66,7 +83,7 @@ async function startServer() {
     console.log('ℹ️  Tip: Set a valid DATABASE_URL in backend/.env to connect to your live Neon instance.');
   }
 
-  // Seed default demonstration records (classes, admin, teacher, students, ESP32 device)
+  // Ensure default staff records exist
   await seedDatabase();
 
   const server = app.listen(ENV.PORT, '0.0.0.0', () => {
@@ -88,9 +105,17 @@ async function startServer() {
   process.on('SIGTERM', shutdown);
 }
 
-startServer().catch((err) => {
-  console.error('Fatal initialization error:', err);
-  process.exit(1);
-});
+// In standard server environments (Render, local, VPS), listen on port.
+// In Vercel serverless environment, Vercel routes HTTP requests directly to app.
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('Fatal initialization error:', err);
+    process.exit(1);
+  });
+} else {
+  // Cold-start background initialization for Vercel Serverless
+  testDbConnection().catch(console.error);
+  seedDatabase().catch(console.error);
+}
 
 export default app;
