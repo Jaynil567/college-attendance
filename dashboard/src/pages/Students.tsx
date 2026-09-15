@@ -45,7 +45,23 @@ export const Students: React.FC<{
         groupName: selectedGroupFilter || undefined,
       } as any);
       if (res.data.success) {
-        setStudents(res.data.students || []);
+        const raw = res.data.students || [];
+        raw.sort((a: any, b: any) => {
+          const gA = a.group_name || '';
+          const gB = b.group_name || '';
+          if (gA !== gB) return gA.localeCompare(gB);
+
+          const dA = a.division || '';
+          const dB = b.division || '';
+          if (dA !== dB) return dA.localeCompare(dB);
+
+          const rA = parseInt((a.roll_number || '0').replace(/\D/g, ''), 10) || 0;
+          const rB = parseInt((b.roll_number || '0').replace(/\D/g, ''), 10) || 0;
+          if (rA !== rB) return rA - rB;
+
+          return (a.roll_number || '').localeCompare(b.roll_number || '');
+        });
+        setStudents(raw);
       }
     } catch (err) {
       console.error('Error fetching students', err);
@@ -221,7 +237,7 @@ export const Students: React.FC<{
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900">Student Directory</h2>
           <p className="text-xs text-slate-500">
-            Authoritative registry sorted by enrollment number with division, roll number & group filters.
+            Authoritative registry sorted by Group → Division → Roll Number with search & filters.
           </p>
         </div>
 
@@ -301,7 +317,9 @@ export const Students: React.FC<{
       <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <h4 className="font-bold text-slate-900">Enrolled Students ({students.length})</h4>
-          <span className="text-xs text-slate-400">Sorted by Enrollment Number</span>
+          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+            Sorted by Group → Division → Roll Number
+          </span>
         </div>
 
         {students.length === 0 ? (
@@ -313,11 +331,11 @@ export const Students: React.FC<{
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3.5">Enrollment Number</th>
-                  <th className="px-6 py-3.5">Name Of Student</th>
+                  <th className="px-6 py-3.5">Group</th>
                   <th className="px-6 py-3.5">Division</th>
                   <th className="px-6 py-3.5">Roll Number</th>
-                  <th className="px-6 py-3.5">Group</th>
+                  <th className="px-6 py-3.5">Enrollment Number</th>
+                  <th className="px-6 py-3.5">Name Of Student</th>
                   <th className="px-6 py-3.5">Password</th>
                   <th className="px-6 py-3.5">Device</th>
                   <th className="px-6 py-3.5 text-right">Actions</th>
@@ -326,15 +344,15 @@ export const Students: React.FC<{
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {students.map((st) => (
                   <tr key={st.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-6 py-3.5 font-mono font-bold text-blue-600">{st.enrollment_number}</td>
-                    <td className="px-6 py-3.5 font-semibold text-slate-900">{st.full_name}</td>
-                    <td className="px-6 py-3.5 font-bold text-slate-700">{st.division || '-'}</td>
-                    <td className="px-6 py-3.5 font-mono text-slate-700">{st.roll_number || '-'}</td>
                     <td className="px-6 py-3.5">
                       <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-bold text-slate-700">
                         {st.group_name || '-'}
                       </span>
                     </td>
+                    <td className="px-6 py-3.5 font-bold text-slate-700">{st.division || '-'}</td>
+                    <td className="px-6 py-3.5 font-mono font-bold text-slate-900">{st.roll_number || '-'}</td>
+                    <td className="px-6 py-3.5 font-mono font-bold text-blue-600">{st.enrollment_number}</td>
+                    <td className="px-6 py-3.5 font-semibold text-slate-900">{st.full_name}</td>
                     <td className="px-6 py-3.5">
                       <div className="inline-flex items-center space-x-2 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
                         <span className="font-mono text-xs font-semibold text-slate-800">

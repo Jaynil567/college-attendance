@@ -313,11 +313,11 @@ export class SessionController {
       }
 
       const recordsRes = await query(
-        `SELECT ar.*, st.enrollment_number, st.full_name
+        `SELECT ar.*, st.enrollment_number, st.full_name, COALESCE(st.division, 'N/A') as division, COALESCE(st.roll_number, 'N/A') as roll_number, COALESCE(st.group_name, 'N/A') as group_name
          FROM attendance_records ar
          JOIN students st ON ar.student_id = st.id
          WHERE ar.session_id = $1
-         ORDER BY ar.marked_at DESC`,
+         ORDER BY COALESCE(st.group_name, '') ASC, COALESCE(st.division, '') ASC, NULLIF(regexp_replace(COALESCE(st.roll_number, '0'), '\\D', '', 'g'), '')::INTEGER ASC NULLS LAST, st.roll_number ASC, ar.marked_at DESC`,
         [id]
       );
 

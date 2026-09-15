@@ -90,6 +90,9 @@ export interface AttendanceRecord {
   subject: string;
   semester: string;
   division: string;
+  student_division?: string;
+  roll_number?: string;
+  group_name?: string;
   session_name: string;
   marked_at: string;
   status: 'present' | 'absent' | 'late' | 'rejected';

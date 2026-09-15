@@ -57,10 +57,10 @@ export class ClassController {
       }
 
       const studentsRes = await query(
-        `SELECT id, enrollment_number, full_name, email, phone_number, status, created_at
+        `SELECT id, enrollment_number, full_name, division, roll_number, group_name, email, phone_number, status, created_at
          FROM students
          WHERE class_id = $1
-         ORDER BY enrollment_number ASC`,
+         ORDER BY COALESCE(group_name, '') ASC, COALESCE(division, '') ASC, NULLIF(regexp_replace(COALESCE(roll_number, '0'), '\\D', '', 'g'), '')::INTEGER ASC NULLS LAST, roll_number ASC`,
         [id]
       );
 

@@ -378,11 +378,22 @@ export const TeacherSessionScreen: React.FC = () => {
                   <Text style={styles.emptyListSub}>Students in this room will appear here automatically</Text>
                 </View>
               ) : (
-                sessionRecords.map((rec, index) => (
+                [...sessionRecords].sort((a, b) => {
+                  const gA = a.group_name || '';
+                  const gB = b.group_name || '';
+                  if (gA !== gB) return gA.localeCompare(gB);
+                  const dA = a.division || '';
+                  const dB = b.division || '';
+                  if (dA !== dB) return dA.localeCompare(dB);
+                  const rA = parseInt((a.roll_number || '0').replace(/\D/g, ''), 10) || 0;
+                  const rB = parseInt((b.roll_number || '0').replace(/\D/g, ''), 10) || 0;
+                  if (rA !== rB) return rA - rB;
+                  return (a.roll_number || '').localeCompare(b.roll_number || '');
+                }).map((rec, index) => (
                   <View key={rec.id || index} style={styles.recordRow}>
                     <View style={styles.recordLeft}>
                       <Text style={styles.recordName}>{rec.full_name || 'Student'}</Text>
-                      <Text style={styles.recordEnrollment}>{rec.enrollment_number}</Text>
+                      <Text style={styles.recordEnrollment}>Group: {rec.group_name || '-'} | Div: {rec.division || '-'} | Roll: {rec.roll_number || '-'} | {rec.enrollment_number}</Text>
                     </View>
                     <View style={styles.recordRight}>
                       <Text style={styles.recordTime}>

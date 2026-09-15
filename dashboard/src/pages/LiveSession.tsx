@@ -339,6 +339,9 @@ export const LiveSession: React.FC<{
                   <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-3.5">#</th>
+                      <th className="px-6 py-3.5">Group</th>
+                      <th className="px-6 py-3.5">Div</th>
+                      <th className="px-6 py-3.5">Roll No</th>
                       <th className="px-6 py-3.5">Enrollment No</th>
                       <th className="px-6 py-3.5">Student Name</th>
                       <th className="px-6 py-3.5">Time Checked In</th>
@@ -350,6 +353,9 @@ export const LiveSession: React.FC<{
                     {sessionRecords.map((rec, index) => (
                       <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="px-6 py-3.5 font-semibold text-slate-400">{index + 1}</td>
+                        <td className="px-6 py-3.5 font-bold text-slate-700">{rec.group_name || '-'}</td>
+                        <td className="px-6 py-3.5 font-bold text-slate-700">{rec.division || '-'}</td>
+                        <td className="px-6 py-3.5 font-mono font-bold text-slate-900">{rec.roll_number || '-'}</td>
                         <td className="px-6 py-3.5 font-mono font-bold text-blue-600">{rec.enrollment_number}</td>
                         <td className="px-6 py-3.5 font-semibold text-slate-900">{rec.full_name || rec.student_name}</td>
                         <td className="px-6 py-3.5 text-xs text-slate-500">

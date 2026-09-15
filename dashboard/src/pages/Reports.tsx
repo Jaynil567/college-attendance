@@ -345,7 +345,10 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
                             <table className="w-full text-left text-xs">
                               <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
                                 <tr>
-                                  <th className="px-4 py-2">Enrollment No</th>
+                                  <th className="px-4 py-2">Group</th>
+                                   <th className="px-4 py-2">Div</th>
+                                   <th className="px-4 py-2">Roll No</th>
+                                   <th className="px-4 py-2">Enrollment No</th>
                                   <th className="px-4 py-2">Student Name</th>
                                   <th className="px-4 py-2">Time Checked In</th>
                                   <th className="px-4 py-2">Signal</th>
@@ -355,7 +358,10 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
                               <tbody className="divide-y divide-slate-100">
                                 {sessionRecordsList.map((r: any) => (
                                   <tr key={r.id}>
-                                    <td className="px-4 py-2 font-mono font-bold text-blue-600">{r.enrollment_number}</td>
+                                    <td className="px-4 py-2 font-bold text-slate-700">{r.group_name || "-"}</td>
+                                      <td className="px-4 py-2 font-bold text-slate-700">{r.division || "-"}</td>
+                                      <td className="px-4 py-2 font-mono font-bold text-slate-900">{r.roll_number || "-"}</td>
+                                      <td className="px-4 py-2 font-mono font-bold text-blue-600">{r.enrollment_number}</td>
                                     <td className="px-4 py-2 font-semibold text-slate-900">{r.student_name}</td>
                                     <td className="px-4 py-2 text-slate-500">{new Date(r.marked_at).toLocaleTimeString()}</td>
                                     <td className="px-4 py-2 text-slate-500">{r.rssi_dbm || -65} dBm</td>
@@ -392,6 +398,9 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                   <tr>
+                    <th className="px-6 py-3.5">Group</th>
+                    <th className="px-6 py-3.5">Division</th>
+                    <th className="px-6 py-3.5">Roll No</th>
                     <th className="px-6 py-3.5">Enrollment No</th>
                     <th className="px-6 py-3.5">Student Name</th>
                     <th className="px-6 py-3.5">Class / Subject</th>
@@ -406,6 +415,9 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
                     const isPresent = rec.status === 'present';
                     return (
                       <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-3.5 font-bold text-slate-700">{rec.group_name || "-"}</td>
+                        <td className="px-6 py-3.5 font-bold text-slate-700">{rec.student_division || rec.division || "-"}</td>
+                        <td className="px-6 py-3.5 font-mono font-bold text-slate-900">{rec.roll_number || "-"}</td>
                         <td className="px-6 py-3.5 font-mono font-bold text-blue-600">{rec.enrollment_number}</td>
                         <td className="px-6 py-3.5 font-semibold text-slate-900">{rec.student_name}</td>
                         <td className="px-6 py-3.5 text-xs text-slate-600">

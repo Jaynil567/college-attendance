@@ -65,11 +65,11 @@ export class ExcelService {
     // 3. Headers
     const headers = [
       'Sr. No',
-      'Enrollment Number',
-      'Name Of Student',
+      'Group',
       'Division',
       'Roll Number',
-      'Group',
+      'Enrollment Number',
+      'Name Of Student',
       'Status',
       'Time Marked',
     ];
@@ -101,11 +101,11 @@ export class ExcelService {
 
       row.values = [
         idx + 1,
-        rec.enrollmentNumber,
-        rec.studentName,
+        rec.groupName || 'N/A',
         rec.division || 'N/A',
         rec.rollNumber || 'N/A',
-        rec.groupName || 'N/A',
+        rec.enrollmentNumber,
+        rec.studentName,
         rec.status.toUpperCase(),
         rec.markedAt ? new Date(rec.markedAt).toLocaleTimeString() : (isPresent ? 'Present' : '-'),
       ];
@@ -163,11 +163,11 @@ export class ExcelService {
 
     // Column widths
     worksheet.getColumn(1).width = 8;  // Sr. No
-    worksheet.getColumn(2).width = 22; // Enrollment Number
-    worksheet.getColumn(3).width = 32; // Name Of Student
-    worksheet.getColumn(4).width = 14; // Division
-    worksheet.getColumn(5).width = 14; // Roll Number
-    worksheet.getColumn(6).width = 14; // Group
+    worksheet.getColumn(2).width = 12; // Group
+    worksheet.getColumn(3).width = 12; // Division
+    worksheet.getColumn(4).width = 14; // Roll Number
+    worksheet.getColumn(5).width = 22; // Enrollment Number
+    worksheet.getColumn(6).width = 32; // Name Of Student
     worksheet.getColumn(7).width = 14; // Status
     worksheet.getColumn(8).width = 18; // Time Marked
 

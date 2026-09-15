@@ -130,7 +130,7 @@ export class StudentController {
         sql += ` AND s.group_name = $${params.length}`;
       }
 
-      sql += ` ORDER BY s.enrollment_number ASC`;
+      sql += ` ORDER BY COALESCE(s.group_name, '') ASC, COALESCE(s.division, '') ASC, NULLIF(regexp_replace(COALESCE(s.roll_number, '0'), '\\D', '', 'g'), '')::INTEGER ASC NULLS LAST, s.roll_number ASC`;
 
       const result = await query(sql, params);
       res.status(200).json({
@@ -336,7 +336,7 @@ export class StudentController {
         sql += ` AND group_name = $${params.length}`;
       }
 
-      sql += ` ORDER BY enrollment_number ASC`;
+      sql += ` ORDER BY COALESCE(group_name, '') ASC, COALESCE(division, '') ASC, NULLIF(regexp_replace(COALESCE(roll_number, '0'), '\\D', '', 'g'), '')::INTEGER ASC NULLS LAST, roll_number ASC`;
 
       const result = await query(sql, params);
 
@@ -346,22 +346,22 @@ export class StudentController {
 
       worksheet.columns = [
         { header: 'Sr. No', key: 'srNo', width: 8 },
-        { header: 'Enrollment Number', key: 'enrollment', width: 22 },
-        { header: 'Name Of Student', key: 'name', width: 32 },
+        { header: 'Group', key: 'group', width: 12 },
         { header: 'Division', key: 'division', width: 12 },
         { header: 'Roll Number', key: 'rollNumber', width: 14 },
-        { header: 'Group', key: 'group', width: 12 },
+        { header: 'Enrollment Number', key: 'enrollment', width: 22 },
+        { header: 'Name Of Student', key: 'name', width: 32 },
         { header: 'Password', key: 'password', width: 14 },
       ];
 
       result.rows.forEach((student: any, index: number) => {
         worksheet.addRow({
           srNo: index + 1,
-          enrollment: student.enrollment_number,
-          name: student.full_name,
+          group: student.group_name || 'N/A',
           division: student.division || 'N/A',
           rollNumber: student.roll_number || 'N/A',
-          group: student.group_name || 'N/A',
+          enrollment: student.enrollment_number,
+          name: student.full_name,
           password: student.plain_password,
         });
       });

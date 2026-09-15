@@ -223,6 +223,9 @@ export class AttendanceController {
       let sql = `
         SELECT ar.id, ar.marked_at, ar.status, ar.rssi_dbm, ar.rejection_reason,
                st.enrollment_number, st.full_name as student_name,
+               COALESCE(st.division, 'N/A') as student_division,
+               COALESCE(st.roll_number, 'N/A') as roll_number,
+               COALESCE(st.group_name, 'N/A') as group_name,
                c.class_name, c.subject, c.semester, c.division,
                s.session_name, s.auditorium_name, s.auditorium_id, d.esp32_id, d.classroom_id
         FROM attendance_records ar
@@ -264,7 +267,7 @@ export class AttendanceController {
         sql += ` AND ar.marked_at <= $${params.length}`;
       }
 
-      sql += ` ORDER BY ar.marked_at DESC`;
+      sql += ` ORDER BY COALESCE(st.group_name, '') ASC, COALESCE(st.division, '') ASC, NULLIF(regexp_replace(COALESCE(st.roll_number, '0'), '\\D', '', 'g'), '')::INTEGER ASC NULLS LAST, st.roll_number ASC, ar.marked_at DESC`;
 
       const result = await query(sql, params);
 
@@ -342,7 +345,7 @@ export class AttendanceController {
           sql += ` AND st.group_name = $${params.length}`;
         }
 
-        sql += ` ORDER BY st.enrollment_number ASC`;
+        sql += ` ORDER BY COALESCE(st.group_name, '') ASC, COALESCE(st.division, '') ASC, NULLIF(regexp_replace(COALESCE(st.roll_number, '0'), '\\D', '', 'g'), '')::INTEGER ASC NULLS LAST, st.roll_number ASC`;
         result = await query(sql, params);
       } else {
         let sql = `
@@ -372,7 +375,7 @@ export class AttendanceController {
           sql += ` AND ar.marked_at <= $${params.length}`;
         }
 
-        sql += ` ORDER BY ar.marked_at DESC, st.enrollment_number ASC`;
+        sql += ` ORDER BY COALESCE(st.group_name, '') ASC, COALESCE(st.division, '') ASC, NULLIF(regexp_replace(COALESCE(st.roll_number, '0'), '\\D', '', 'g'), '')::INTEGER ASC NULLS LAST, st.roll_number ASC, ar.marked_at DESC`;
         result = await query(sql, params);
       }
 
