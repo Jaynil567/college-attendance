@@ -195,9 +195,10 @@ export const MarkAttendanceScreen: React.FC = () => {
         <Text style={styles.studentGreeting}>Hello, {student?.fullName || 'Student'}</Text>
         <Text style={styles.studentMeta}>
           Enrollment: <Text style={styles.statBold}>{student?.enrollmentNumber}</Text>
+          {student?.division ? ` • Division: ${student.division}` : ''}
         </Text>
         <Text style={styles.studentSub}>
-          Select the Auditorium you are seated in to mark attendance.
+          Live session attendance checkpoint for your division.
         </Text>
       </View>
 
@@ -281,94 +282,77 @@ export const MarkAttendanceScreen: React.FC = () => {
 
       {/* Section Title */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>College Auditoriums (3 Rooms)</Text>
-        <Text style={styles.sectionSub}>Live lectures & attendance checkpoints</Text>
+        <Text style={styles.sectionTitle}>Attendance Checkpoint</Text>
+        <Text style={styles.sectionSub}>Filtered for Division {student?.division || 'Assigned'}</Text>
       </View>
 
-      {/* 3 Auditorium Cards */}
+      {/* Active Session for Division */}
       {loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="small" color="#2563EB" />
-          <Text style={styles.loadingText}>Syncing Auditorium Status...</Text>
+          <Text style={styles.loadingText}>Checking active sessions...</Text>
         </View>
-      ) : (
-        auditoriums.map((audi) => {
-          const isLive = audi.isLive && !!audi.activeSession;
-          const hasMarked = audi.hasMarkedAttendance;
-
+      ) : (() => {
+        const liveAudi = auditoriums.find((a) => a.isLive && a.activeSession);
+        if (liveAudi && liveAudi.activeSession) {
+          const hasMarked = liveAudi.hasMarkedAttendance;
           return (
-            <View
-              key={audi.id}
-              style={[
-                styles.audiCard,
-                isLive ? (hasMarked ? styles.audiCardMarked : styles.audiCardLive) : styles.audiCardVacant,
-              ]}
-            >
+            <View style={[styles.audiCard, styles.audiCardLive]}>
               <View style={styles.audiHeader}>
                 <View style={styles.audiTitleRow}>
-                  <Text style={styles.audiEmoji}>{isLive ? '🏛️' : '🏫'}</Text>
-                  <Text style={styles.audiName}>{audi.name}</Text>
+                  <Text style={styles.audiEmoji}>📡</Text>
+                  <Text style={styles.audiName}>Live Lecture Session</Text>
                 </View>
-
-                <View
-                  style={[
-                    styles.badge,
-                    isLive ? (hasMarked ? styles.badgeMarked : styles.badgeLive) : styles.badgeVacant,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.badgeText,
-                      isLive ? (hasMarked ? styles.badgeTextMarked : styles.badgeTextLive) : styles.badgeTextVacant,
-                    ]}
-                  >
-                    {hasMarked ? '✅ PRESENT' : isLive ? '🟢 LIVE' : '⚪ VACANT'}
+                <View style={[styles.badge, hasMarked ? styles.badgeMarked : styles.badgeLive]}>
+                  <Text style={[styles.badgeText, hasMarked ? styles.badgeTextMarked : styles.badgeTextLive]}>
+                    {hasMarked ? '✅ PRESENT' : '🟢 LIVE'}
                   </Text>
                 </View>
               </View>
 
-              {isLive && audi.activeSession && (
-                <View style={styles.lectureBox}>
-                  <Text style={styles.lectureSubject}>{audi.activeSession.subject}</Text>
-                  <Text style={styles.lectureTeacher}>👨‍🏫 {audi.activeSession.teacherName}</Text>
-                  <Text style={styles.lectureTime}>
-                    Started {new Date(audi.activeSession.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                </View>
-              )}
+              <View style={styles.lectureBox}>
+                <Text style={styles.lectureSubject}>{liveAudi.activeSession.subject}</Text>
+                <Text style={styles.lectureTeacher}>👨‍🏫 Faculty: {liveAudi.activeSession.teacherName}</Text>
+                <Text style={styles.lectureTime}>🏛️ Location: {liveAudi.name}</Text>
+                <Text style={styles.lectureTime}>
+                  Started: {new Date(liveAudi.activeSession.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
 
-              {!isLive && (
-                <View style={styles.vacantBox}>
-                  <Text style={styles.vacantText}>No lecture currently running.</Text>
-                </View>
-              )}
-
-              {isLive && (
-                <View style={styles.buttonContainer}>
-                  {hasMarked ? (
-                    <View style={styles.markedBanner}>
-                      <Text style={styles.markedBannerText}>✅ You are marked PRESENT</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.markAudiButton}
-                      onPress={() => handleMarkAttendance(audi)}
-                      disabled={flowState !== 'idle'}
-                    >
-                      <Text style={styles.markAudiButtonText}>
-                        👆 Mark Attendance
-                      </Text>
-                      <Text style={styles.markAudiSubtext}>
-                        Fingerprint → BLE → Verify
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
+              <View style={styles.buttonContainer}>
+                {hasMarked ? (
+                  <View style={styles.markedBanner}>
+                    <Text style={styles.markedBannerText}>✅ You are marked PRESENT for this session</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.markAudiButton}
+                    onPress={() => handleMarkAttendance(liveAudi)}
+                    disabled={flowState !== 'idle'}
+                  >
+                    <Text style={styles.markAudiButtonText}>
+                      👆 Mark Attendance
+                    </Text>
+                    <Text style={styles.markAudiSubtext}>
+                      Fingerprint → BLE Proximity → Submit
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           );
-        })
-      )}
+        } else {
+          return (
+            <View style={styles.noSessionCard}>
+              <Text style={styles.noSessionEmoji}>⏳</Text>
+              <Text style={styles.noSessionTitle}>No Active Session for Division {student?.division || 'assigned'}</Text>
+              <Text style={styles.noSessionDesc}>
+                When your faculty starts an attendance session for your division ({student?.division || 'assigned'}), the "Mark Attendance" button will appear here automatically.
+              </Text>
+            </View>
+          );
+        }
+      })()}
     </ScrollView>
   );
 };
@@ -493,4 +477,18 @@ const styles = StyleSheet.create({
   },
   markAudiButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   markAudiSubtext: { color: '#BFDBFE', fontSize: 10, fontWeight: '600', marginTop: 2 },
+
+  // No Session Card
+  noSessionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 8,
+  },
+  noSessionEmoji: { fontSize: 36, marginBottom: 10 },
+  noSessionTitle: { fontSize: 15, fontWeight: '800', color: '#1E293B', textAlign: 'center' },
+  noSessionDesc: { fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 6, lineHeight: 18 },
 });

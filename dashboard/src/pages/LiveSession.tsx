@@ -18,6 +18,12 @@ interface AuditoriumState {
   } | null;
 }
 
+const ALL_DIVISIONS = [
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9',
+  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9',
+  'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9',
+];
+
 export const LiveSession: React.FC<{
   classes?: any[];
   devices?: any[];
@@ -34,12 +40,25 @@ export const LiveSession: React.FC<{
   const [loading, setLoading] = useState(true);
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
 
-  // Start Session Form State (Only Auditorium + Subject!)
+  // Start Session Form State
   const [formAuditoriumId, setFormAuditoriumId] = useState<'AUDITORIUM_01' | 'AUDITORIUM_02' | 'AUDITORIUM_03'>('AUDITORIUM_01');
   const [subjectTitle, setSubjectTitle] = useState('');
+  const [selectedDivisions, setSelectedDivisions] = useState<string[]>(['A1']);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  const toggleDivision = (div: string) => {
+    setSelectedDivisions((prev) =>
+      prev.includes(div) ? prev.filter((d) => d !== div) : [...prev, div]
+    );
+  };
+
+  const selectDivCategory = (cat: 'A' | 'B' | 'C' | 'ALL' | 'NONE') => {
+    if (cat === 'ALL') setSelectedDivisions([...ALL_DIVISIONS]);
+    else if (cat === 'NONE') setSelectedDivisions([]);
+    else setSelectedDivisions(ALL_DIVISIONS.filter((d) => d.startsWith(cat)));
+  };
 
   // Poll 3 Auditoriums real-time status & active feed
   const fetchAuditoriumStatus = async () => {
@@ -87,6 +106,10 @@ export const LiveSession: React.FC<{
       setFormError('Please enter a subject or lecture title');
       return;
     }
+    if (selectedDivisions.length === 0) {
+      setFormError('Please select at least one target division');
+      return;
+    }
 
     setFormError(null);
     setSubmitting(true);
@@ -95,6 +118,7 @@ export const LiveSession: React.FC<{
       const res = await ApiService.startSession({
         auditoriumId: formAuditoriumId,
         subject: subjectTitle.trim(),
+        targetDivisions: selectedDivisions,
       });
 
       if (res.data.success) {
@@ -428,9 +452,44 @@ export const LiveSession: React.FC<{
                 className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Students inside this auditorium will see this lecture title and can tap to mark attendance.
+          </div>
+
+          {/* Target Divisions Selector */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold uppercase text-slate-600">
+                Target Divisions ({selectedDivisions.length} Selected)
+              </label>
+              <div className="flex items-center space-x-1 text-[11px]">
+                <button type="button" onClick={() => selectDivCategory('A')} className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded">All A</button>
+                <button type="button" onClick={() => selectDivCategory('B')} className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded">All B</button>
+                <button type="button" onClick={() => selectDivCategory('C')} className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded">All C</button>
+                <button type="button" onClick={() => selectDivCategory('ALL')} className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded">All</button>
+                <button type="button" onClick={() => selectDivCategory('NONE')} className="px-1.5 py-0.5 bg-red-50 hover:bg-red-100 text-red-700 font-semibold rounded">Clear</button>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 mb-2">
+              Only students in selected divisions will be shown the attendance button on their phone.
             </p>
+            <div className="grid grid-cols-9 gap-1.5 max-h-36 overflow-y-auto p-1 bg-slate-50 border border-slate-200 rounded-xl">
+              {ALL_DIVISIONS.map((div) => {
+                const isSelected = selectedDivisions.includes(div);
+                return (
+                  <button
+                    key={div}
+                    type="button"
+                    onClick={() => toggleDivision(div)}
+                    className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {div}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800">

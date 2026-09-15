@@ -28,10 +28,17 @@ const AUDITORIUM_BLE_UUIDS: Record<string, string> = {
   AUDITORIUM_03: '4fafc201-1fb5-459e-8fcc-c5c9c3319143',
 };
 
+const ALL_DIVISIONS = [
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9',
+  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9',
+  'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9',
+];
+
 export const TeacherSessionScreen: React.FC = () => {
   const { teacher, logout } = useMobileAuth();
   const [selectedAudiId, setSelectedAudiId] = useState<'AUDITORIUM_01' | 'AUDITORIUM_02' | 'AUDITORIUM_03'>('AUDITORIUM_01');
   const [subjectTitle, setSubjectTitle] = useState('');
+  const [selectedDivisions, setSelectedDivisions] = useState<string[]>(['A1']);
   const [activeSession, setActiveSession] = useState<any | null>(null);
   const [sessionRecords, setSessionRecords] = useState<any[]>([]);
   const [auditoriumsStatus, setAuditoriumsStatus] = useState<any[]>([]);
@@ -40,6 +47,18 @@ export const TeacherSessionScreen: React.FC = () => {
   const [ending, setEnding] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [bleActive, setBleActive] = useState(false);
+
+  const toggleDivision = (div: string) => {
+    setSelectedDivisions((prev) =>
+      prev.includes(div) ? prev.filter((d) => d !== div) : [...prev, div]
+    );
+  };
+
+  const selectDivCategory = (cat: 'A' | 'B' | 'C' | 'ALL' | 'NONE') => {
+    if (cat === 'ALL') setSelectedDivisions([...ALL_DIVISIONS]);
+    else if (cat === 'NONE') setSelectedDivisions([]);
+    else setSelectedDivisions(ALL_DIVISIONS.filter((d) => d.startsWith(cat)));
+  };
 
   const timerRef = useRef<any>(null);
   const pollRef = useRef<any>(null);
@@ -134,6 +153,11 @@ export const TeacherSessionScreen: React.FC = () => {
       return;
     }
 
+    if (selectedDivisions.length === 0) {
+      Alert.alert('Divisions Required', 'Please select at least one division for this session.');
+      return;
+    }
+
     const audiObj = AUDITORIUM_OPTIONS.find((a) => a.id === selectedAudiId);
     const audiStatus = auditoriumsStatus.find((a) => a.id === selectedAudiId);
 
@@ -150,6 +174,7 @@ export const TeacherSessionScreen: React.FC = () => {
       const res = await MobileApiService.startSession({
         auditoriumId: selectedAudiId,
         sessionName: subjectTitle.trim(),
+        targetDivisions: selectedDivisions,
       });
 
       if (res.data.success && res.data.session) {
@@ -417,6 +442,51 @@ export const TeacherSessionScreen: React.FC = () => {
               placeholder="e.g. Cloud Computing & Distributed Systems"
               placeholderTextColor="#94A3B8"
             />
+
+            {/* Step 3: Target Divisions */}
+            <Text style={[styles.sectionHeading, { marginTop: 24 }]}>
+              Step 3: Select Target Divisions ({selectedDivisions.length} Selected)
+            </Text>
+            <Text style={styles.sectionSubtitle}>
+              Only students belonging to selected divisions will get the "Mark Attendance" button on their app:
+            </Text>
+
+            {/* Division Quick Filter Bar */}
+            <View style={styles.divPresetRow}>
+              <TouchableOpacity style={styles.divPresetChip} onPress={() => selectDivCategory('A')}>
+                <Text style={styles.divPresetText}>All A's</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.divPresetChip} onPress={() => selectDivCategory('B')}>
+                <Text style={styles.divPresetText}>All B's</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.divPresetChip} onPress={() => selectDivCategory('C')}>
+                <Text style={styles.divPresetText}>All C's</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.divPresetChip} onPress={() => selectDivCategory('ALL')}>
+                <Text style={styles.divPresetText}>Select All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.divPresetChip} onPress={() => selectDivCategory('NONE')}>
+                <Text style={styles.divPresetText}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Division Chips Grid */}
+            <View style={styles.divGrid}>
+              {ALL_DIVISIONS.map((div) => {
+                const isSelected = selectedDivisions.includes(div);
+                return (
+                  <TouchableOpacity
+                    key={div}
+                    style={[styles.divChip, isSelected && styles.divChipSelected]}
+                    onPress={() => toggleDivision(div)}
+                  >
+                    <Text style={[styles.divChipText, isSelected && styles.divChipTextSelected]}>
+                      {div}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             {/* Notice info */}
             <View style={styles.infoBox}>
@@ -773,6 +843,51 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  // Division selection styles
+  divPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  divPresetChip: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  divPresetText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  divGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  divChip: {
+    width: '18%',
+    paddingVertical: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  divChipSelected: {
+    backgroundColor: '#059669',
+    borderColor: '#047857',
+  },
+  divChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  divChipTextSelected: {
+    color: '#FFFFFF',
   },
   endSessionBtn: {
     backgroundColor: '#DC2626',

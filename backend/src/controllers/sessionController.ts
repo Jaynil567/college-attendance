@@ -13,6 +13,7 @@ const AUDITORIUM_CONFIG = [
 const startSessionSchema = z.object({
   auditoriumId: z.enum(['AUDITORIUM_01', 'AUDITORIUM_02', 'AUDITORIUM_03']).optional(),
   subject: z.string().min(2, 'Subject / Lecture title is required').optional(),
+  targetDivisions: z.array(z.string()).optional().nullable(),
   classId: z.string().uuid().optional().nullable(),
   esp32Id: z.string().optional().nullable(),
   sessionName: z.string().optional().nullable(),
@@ -35,7 +36,7 @@ export class SessionController {
         return;
       }
 
-      const { auditoriumId, subject, classId, esp32Id, sessionName, durationMinutes } = parsed.data;
+      const { auditoriumId, subject, targetDivisions, classId, esp32Id, sessionName, durationMinutes } = parsed.data;
       const createdBy = req.user?.id || null;
       const sessionId = crypto.randomUUID();
       const startTime = new Date();
@@ -45,6 +46,7 @@ export class SessionController {
       let targetAuditoriumName = null;
       let targetEsp32DeviceId = esp32Id || null;
       const lectureTitle = (subject || sessionName || 'Lecture').trim();
+      const targetDivisionsStr = targetDivisions && targetDivisions.length > 0 ? JSON.stringify(targetDivisions) : null;
 
       if (targetAuditoriumId) {
         const audiMatch = AUDITORIUM_CONFIG.find((a) => a.id === targetAuditoriumId);
@@ -85,11 +87,11 @@ export class SessionController {
 
       const result = await query(
         `INSERT INTO attendance_sessions (
-          id, class_id, esp32_id, auditorium_id, auditorium_name, session_name,
+          id, class_id, esp32_id, auditorium_id, auditorium_name, session_name, target_divisions,
           start_time, end_time, status, created_by, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, NOW())
         RETURNING *`,
-        [sessionId, classId || null, targetEsp32DeviceId, targetAuditoriumId, targetAuditoriumName, lectureTitle, startTime, endTime, createdBy]
+        [sessionId, classId || null, targetEsp32DeviceId, targetAuditoriumId, targetAuditoriumName, lectureTitle, targetDivisionsStr, startTime, endTime, createdBy]
       );
 
       // Fetch joined details
@@ -165,7 +167,7 @@ export class SessionController {
 
       // 2. Fetch active sessions in auditoriums
       const activeSessionsRes = await query(
-        `SELECT s.id, s.session_name, s.auditorium_id, s.auditorium_name, s.start_time, s.end_time, s.created_by,
+        `SELECT s.id, s.session_name, s.auditorium_id, s.auditorium_name, s.target_divisions, s.start_time, s.end_time, s.created_by,
                 t.full_name as teacher_name,
                 COUNT(ar.id)::int as present_count
          FROM attendance_sessions s
@@ -176,9 +178,15 @@ export class SessionController {
       );
       const activeSessions = activeSessionsRes.rows || [];
 
-      // 3. If student, check if they already marked attendance for any active session
+      // 3. If student, get student's division & check if they marked attendance
+      let studentDivision: string | null = null;
       let markedSessionIds = new Set<string>();
       if (studentId) {
+        const studentRes = await query(`SELECT division FROM students WHERE id = $1`, [studentId]);
+        if (studentRes.rows && studentRes.rows.length > 0) {
+          studentDivision = studentRes.rows[0].division;
+        }
+
         const markedRes = await query(
           `SELECT session_id FROM attendance_records WHERE student_id = $1 AND status = 'present'`,
           [studentId]
@@ -188,9 +196,26 @@ export class SessionController {
 
       const auditoriums = AUDITORIUM_CONFIG.map((audi) => {
         const device = devices.find((d: any) => d.esp32_id?.toUpperCase() === audi.id);
-        const activeSession = activeSessions.find(
+        let activeSession = activeSessions.find(
           (s: any) => s.auditorium_id === audi.id || (device && s.esp32_id === device.id)
         );
+
+        // Check division restriction for student
+        if (activeSession && studentId && studentDivision) {
+          let targetDivs: string[] = [];
+          if (activeSession.target_divisions) {
+            try {
+              targetDivs = typeof activeSession.target_divisions === 'string'
+                ? JSON.parse(activeSession.target_divisions)
+                : activeSession.target_divisions;
+            } catch (e) {
+              targetDivs = String(activeSession.target_divisions).split(',').map((s) => s.trim());
+            }
+          }
+          if (targetDivs.length > 0 && !targetDivs.includes(studentDivision)) {
+            activeSession = null;
+          }
+        }
 
         return {
           id: audi.id,
@@ -204,6 +229,7 @@ export class SessionController {
                 sessionName: activeSession.session_name,
                 teacherName: activeSession.teacher_name || 'Faculty',
                 startTime: activeSession.start_time,
+                targetDivisions: activeSession.target_divisions,
                 presentCount: activeSession.present_count || 0,
               }
             : null,
