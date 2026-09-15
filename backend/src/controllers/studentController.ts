@@ -288,22 +288,49 @@ export class StudentController {
   }
 
   /**
-   * Reset all student passwords to a random 4-digit code
+   * Reset all student passwords to a random 4-digit code (Optimized Bulk Execution)
    */
   static async resetAllPasswords(req: Request, res: Response): Promise<void> {
     try {
       const students = await query('SELECT id FROM students WHERE status = $1', ['active']);
-      let count = 0;
-      for (const student of students.rows) {
-        const newPassword = String(Math.floor(1000 + Math.random() * 9000));
-        const hash = await bcrypt.hash(newPassword, 10);
-        await query(
-          'UPDATE students SET password_hash = $1, plain_password = $2, updated_at = NOW() WHERE id = $3',
-          [hash, newPassword, student.id]
-        );
-        count++;
+      const studentRows = students.rows || [];
+      const total = studentRows.length;
+      if (total === 0) {
+        res.status(200).json({ success: true, count: 0, message: 'No active students to rotate' });
+        return;
       }
-      res.status(200).json({ success: true, count });
+
+      const chunkSize = 50;
+      let count = 0;
+
+      for (let i = 0; i < total; i += chunkSize) {
+        const chunk = studentRows.slice(i, i + chunkSize);
+        const processed = await Promise.all(
+          chunk.map(async (student: any) => {
+            const newPassword = String(Math.floor(1000 + Math.random() * 9000));
+            const hash = await bcrypt.hash(newPassword, 8);
+            return { id: student.id, newPassword, hash };
+          })
+        );
+
+        const hashCases = processed.map((p) => `WHEN id = '${p.id}' THEN '${p.hash}'`).join(' ');
+        const plainCases = processed.map((p) => `WHEN id = '${p.id}' THEN '${p.newPassword}'`).join(' ');
+        const idList = processed.map((p) => `'${p.id}'`).join(',');
+
+        const updateSql = `
+          UPDATE students 
+          SET password_hash = CASE ${hashCases} END,
+              plain_password = CASE ${plainCases} END,
+              updated_at = NOW()
+          WHERE id IN (${idList})
+        `;
+
+        await query(updateSql);
+        count += processed.length;
+      }
+
+      console.log(`[StudentController.resetAllPasswords] Rotated passwords for ${count} students successfully.`);
+      res.status(200).json({ success: true, count, message: `Rotated passwords for ${count} students` });
     } catch (err: any) {
       console.error('[StudentController.resetAllPasswords]', err);
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });

@@ -6,6 +6,7 @@ import deviceRoutes from './deviceRoutes.js';
 import sessionRoutes from './sessionRoutes.js';
 import attendanceRoutes from './attendanceRoutes.js';
 import teacherRoutes from './teacherRoutes.js';
+import cronRoutes from './cronRoutes.js';
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/teachers', teacherRoutes);
 router.use('/devices', deviceRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/attendance', attendanceRoutes);
+router.use('/cron', cronRoutes);
 
 export default router;
