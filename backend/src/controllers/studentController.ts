@@ -7,6 +7,9 @@ import { query } from '../config/db.js';
 const studentCreateSchema = z.object({
   enrollmentNumber: z.string().min(3, 'Enrollment number is required'),
   fullName: z.string().min(2, 'Full name is required'),
+  division: z.string().optional().nullable(),
+  rollNumber: z.string().optional().nullable(),
+  groupName: z.string().optional().nullable(),
   email: z.string().email('Invalid email address').optional().nullable(),
   phoneNumber: z.string().optional().nullable(),
   password: z.string().min(4, 'Password must be at least 4 characters').default('student123'),
@@ -16,11 +19,15 @@ const studentCreateSchema = z.object({
 
 const studentUpdateSchema = z.object({
   fullName: z.string().min(2).optional(),
+  division: z.string().optional().nullable(),
+  rollNumber: z.string().optional().nullable(),
+  groupName: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
   phoneNumber: z.string().optional().nullable(),
   password: z.string().min(4).optional(),
   classId: z.string().uuid().optional().nullable(),
   status: z.enum(['active', 'inactive']).optional(),
+  device_id: z.string().optional().nullable(),
 });
 
 export class StudentController {
@@ -39,7 +46,7 @@ export class StudentController {
         return;
       }
 
-      const { enrollmentNumber, fullName, email, phoneNumber, password, classId, status } = parsed.data;
+      const { enrollmentNumber, fullName, division, rollNumber, groupName, email, phoneNumber, password, classId, status } = parsed.data;
       const cleanEnrollment = enrollmentNumber.trim().toUpperCase();
 
       // Check for existing enrollment number
@@ -63,10 +70,10 @@ export class StudentController {
       const studentId = crypto.randomUUID();
 
       const result = await query(
-        `INSERT INTO students (id, enrollment_number, full_name, email, phone_number, password_hash, plain_password, class_id, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-         RETURNING id, enrollment_number, full_name, email, phone_number, plain_password, class_id, status, created_at`,
-        [studentId, cleanEnrollment, fullName.trim(), email?.trim() || null, phoneNumber?.trim() || null, passwordHash, studentPassword, classId || null, status]
+        `INSERT INTO students (id, enrollment_number, full_name, division, roll_number, group_name, email, phone_number, password_hash, plain_password, class_id, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+         RETURNING id, enrollment_number, full_name, division, roll_number, group_name, email, phone_number, plain_password, class_id, status, created_at`,
+        [studentId, cleanEnrollment, fullName.trim(), division?.trim() || null, rollNumber?.trim() || null, groupName?.trim() || null, email?.trim() || null, phoneNumber?.trim() || null, passwordHash, studentPassword, classId || null, status]
       );
 
       res.status(201).json({
@@ -144,7 +151,7 @@ export class StudentController {
     try {
       const { id } = req.params;
       const studentRes = await query(
-        `SELECT s.id, s.enrollment_number, s.full_name, s.email, s.phone_number,
+        `SELECT s.id, s.enrollment_number, s.full_name, s.division, s.roll_number, s.group_name, s.email, s.phone_number,
                 s.plain_password, s.status, s.created_at,
                 c.id as class_id, c.class_name, c.subject, c.semester, c.division
          FROM students s
@@ -197,7 +204,7 @@ export class StudentController {
         return;
       }
 
-      const { fullName, email, phoneNumber, password, classId, status } = parsed.data;
+      const { fullName, division, rollNumber, groupName, email, phoneNumber, password, classId, status } = parsed.data;
 
       // Build dynamic update
       const updates: string[] = ['updated_at = NOW()'];
@@ -206,6 +213,18 @@ export class StudentController {
       if (fullName) {
         params.push(fullName.trim());
         updates.push(`full_name = $${params.length}`);
+      }
+      if (division !== undefined) {
+        params.push(division ? division.trim() : null);
+        updates.push(`division = $${params.length}`);
+      }
+      if (rollNumber !== undefined) {
+        params.push(rollNumber ? rollNumber.trim() : null);
+        updates.push(`roll_number = $${params.length}`);
+      }
+      if (groupName !== undefined) {
+        params.push(groupName ? groupName.trim() : null);
+        updates.push(`group_name = $${params.length}`);
       }
       if (email !== undefined) {
         params.push(email ? email.trim() : null);
@@ -223,6 +242,10 @@ export class StudentController {
         params.push(status);
         updates.push(`status = $${params.length}`);
       }
+      if (req.body.device_id !== undefined) {
+        params.push(req.body.device_id);
+        updates.push(`device_id = $${params.length}`);
+      }
       if (password) {
         const salt = await bcrypt.genSalt(10);
         const hash = await bcrypt.hash(password, salt);
@@ -233,7 +256,7 @@ export class StudentController {
       }
 
       params.push(id);
-      const sql = `UPDATE students SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING id, enrollment_number, full_name, email, phone_number, plain_password, class_id, status, updated_at`;
+      const sql = `UPDATE students SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING id, enrollment_number, full_name, division, roll_number, group_name, email, phone_number, plain_password, class_id, status, updated_at`;
 
       const result = await query(sql, params);
       if (!result.rows || result.rows.length === 0) {

@@ -24,6 +24,9 @@ export const Students: React.FC<{
   // Form fields
   const [enrollmentNumber, setEnrollmentNumber] = useState('');
   const [fullName, setFullName] = useState('');
+  const [division, setDivision] = useState('');
+  const [rollNumber, setRollNumber] = useState('');
+  const [groupName, setGroupName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('Student@123');
@@ -69,6 +72,9 @@ export const Students: React.FC<{
       await ApiService.createStudent({
         enrollmentNumber: enrollmentNumber.trim().toUpperCase(),
         fullName: fullName.trim(),
+        division: division.trim() || undefined,
+        rollNumber: rollNumber.trim() || undefined,
+        groupName: groupName.trim() || undefined,
         email: email.trim() || undefined,
         phoneNumber: phoneNumber.trim() || undefined,
         password: password || 'Student@123',
@@ -96,6 +102,9 @@ export const Students: React.FC<{
     try {
       await ApiService.updateStudent(currentEditStudent.id, {
         fullName: fullName.trim(),
+        division: division.trim() || null,
+        rollNumber: rollNumber.trim() || null,
+        groupName: groupName.trim() || null,
         email: email.trim() || null,
         phoneNumber: phoneNumber.trim() || null,
         password: password ? password.trim() : undefined,
@@ -117,6 +126,9 @@ export const Students: React.FC<{
   const openEditModal = (student: Student) => {
     setCurrentEditStudent(student);
     setFullName(student.full_name);
+    setDivision(student.division || '');
+    setRollNumber(student.roll_number || '');
+    setGroupName(student.group_name || '');
     setEmail(student.email || '');
     setPhoneNumber(student.phone_number || '');
     setPassword(student.plain_password || '');
@@ -190,6 +202,9 @@ export const Students: React.FC<{
   const resetForm = () => {
     setEnrollmentNumber('');
     setFullName('');
+    setDivision('');
+    setRollNumber('');
+    setGroupName('');
     setEmail('');
     setPhoneNumber('');
     setPassword('Student@123');
@@ -418,6 +433,39 @@ export const Students: React.FC<{
             />
           </div>
 
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Division</label>
+              <input
+                type="text"
+                value={division}
+                onChange={(e) => setDivision(e.target.value)}
+                placeholder="e.g. A1"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Roll Number</label>
+              <input
+                type="text"
+                value={rollNumber}
+                onChange={(e) => setRollNumber(e.target.value)}
+                placeholder="e.g. 1"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Group</label>
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="e.g. G1"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Email Address</label>
@@ -522,6 +570,39 @@ export const Students: React.FC<{
               onChange={(e) => setFullName(e.target.value)}
               className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Division</label>
+              <input
+                type="text"
+                value={division}
+                onChange={(e) => setDivision(e.target.value)}
+                placeholder="e.g. A1"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Roll Number</label>
+              <input
+                type="text"
+                value={rollNumber}
+                onChange={(e) => setRollNumber(e.target.value)}
+                placeholder="e.g. 1"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">Group</label>
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="e.g. G1"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+              />
+            </div>
           </div>
 
           <div>
