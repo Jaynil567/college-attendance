@@ -34,13 +34,15 @@
         {
           "isBackgroundEnabled": false,
           "modes": [
-            "central"
+            "central",
+            "peripheral"
           ],
           "bluetoothAlwaysPermission": "Allow College Attendance to scan for classroom presence beacons."
         }
       ],
       "expo-secure-store",
-      "expo-local-authentication"
+      "expo-local-authentication",
+      "./plugins/withBleAdvertiserFix.js"
     ],
     "extra": {
       "eas": {
