@@ -10,6 +10,7 @@ import {
   Alert,
   RefreshControl,
   Linking,
+  Modal,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -50,6 +51,48 @@ export const TeacherSessionScreen: React.FC = () => {
   const [ending, setEnding] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [bleActive, setBleActive] = useState(false);
+
+  // Manual Check-In State
+  const [manualDivision, setManualDivision] = useState('');
+  const [manualRollNumber, setManualRollNumber] = useState('');
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [isManualModalVisible, setIsManualModalVisible] = useState(false);
+
+  const handleManualCheckIn = async () => {
+    if (!activeSession) return;
+    const div = manualDivision.trim().toUpperCase();
+    const roll = manualRollNumber.trim();
+    if (!div) {
+      Alert.alert('Division Required', 'Please enter or select Division (e.g. A1, A2)');
+      return;
+    }
+    if (!roll) {
+      Alert.alert('Roll Number Required', 'Please enter student Roll Number (e.g. 86)');
+      return;
+    }
+
+    setManualSubmitting(true);
+    try {
+      const res = await MobileApiService.manualMarkAttendance({
+        sessionId: activeSession.id,
+        division: div,
+        rollNumber: roll,
+      });
+
+      if (res.data.success) {
+        Alert.alert('✅ Success', res.data.message || 'Student marked Present!');
+        setManualRollNumber('');
+        fetchSessionRecords(activeSession.id);
+      } else {
+        Alert.alert('Failed', res.data.message || 'Could not mark attendance');
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to mark attendance';
+      Alert.alert('Error', msg);
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
 
   const toggleDivision = (div: string) => {
     setSelectedDivisions((prev) =>
@@ -366,6 +409,19 @@ export const TeacherSessionScreen: React.FC = () => {
               {bleActive && <View style={styles.blePulseDot} />}
             </View>
 
+            {/* Manual Check-In Button */}
+            <TouchableOpacity
+              style={styles.manualCheckInBtn}
+              onPress={() => {
+                if (selectedDivisions.length > 0 && !manualDivision) {
+                  setManualDivision(selectedDivisions[0]);
+                }
+                setIsManualModalVisible(true);
+              }}
+            >
+              <Text style={styles.manualCheckInBtnText}>✏️ Manual Mark Present (Division & Roll No)</Text>
+            </TouchableOpacity>
+
             {/* Real-Time Attendance Stream List */}
             <View style={styles.liveListContainer}>
               <Text style={styles.liveListTitle}>
@@ -553,6 +609,74 @@ export const TeacherSessionScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Manual Check-In Modal */}
+        <Modal
+          visible={isManualModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setIsManualModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>✏️ Manual Present Check-In</Text>
+              <Text style={styles.modalSub}>
+                Enter Division and Roll Number to mark a student Present manually if their phone verification failed.
+              </Text>
+
+              <Text style={styles.inputLabel}>Select Division:</Text>
+              <View style={styles.modalDivRow}>
+                {(selectedDivisions.length > 0 ? selectedDivisions : ALL_DIVISIONS.slice(0, 9)).map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.modalDivChip, manualDivision === d && styles.modalDivChipActive]}
+                    onPress={() => setManualDivision(d)}
+                  >
+                    <Text style={[styles.modalDivText, manualDivision === d && styles.modalDivTextActive]}>{d}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Division (e.g. A1, B2)"
+                value={manualDivision}
+                onChangeText={setManualDivision}
+                autoCapitalize="characters"
+              />
+
+              <Text style={styles.inputLabel}>Enter Roll Number:</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Roll Number (e.g. 86, 1, 44)"
+                value={manualRollNumber}
+                onChangeText={setManualRollNumber}
+                keyboardType="number-pad"
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnCancel]}
+                  onPress={() => setIsManualModalVisible(false)}
+                >
+                  <Text style={styles.modalBtnCancelText}>Done / Close</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnSubmit, manualSubmitting && styles.btnDisabled]}
+                  onPress={handleManualCheckIn}
+                  disabled={manualSubmitting}
+                >
+                  {manualSubmitting ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.modalBtnSubmitText}>✅ Mark Present</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </View>
   );
@@ -970,5 +1094,123 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: '#22C55E',
+  },
+  manualCheckInBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  manualCheckInBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  modalSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 16,
+    lineHeight: 16,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 6,
+    marginTop: 6,
+  },
+  modalDivRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  modalDivChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  modalDivChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#047857',
+  },
+  modalDivText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  modalDivTextActive: {
+    color: '#FFFFFF',
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0F172A',
+    marginBottom: 10,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    gap: 10,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  modalBtnCancelText: {
+    color: '#475569',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  modalBtnSubmit: {
+    backgroundColor: '#059669',
+  },
+  modalBtnSubmitText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
   },
 });

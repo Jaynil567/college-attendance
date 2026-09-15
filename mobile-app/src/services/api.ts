@@ -58,4 +58,7 @@ export const MobileApiService = {
 
   getSessionDetails: (id: string) =>
     mobileApi.get(`/sessions/${id}`),
+
+  manualMarkAttendance: (data: { sessionId: string; division: string; rollNumber: string }) =>
+    mobileApi.post('/attendance/manual-mark', data),
 };

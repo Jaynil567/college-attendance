@@ -410,4 +410,130 @@ export class AttendanceController {
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
     }
   }
+
+  /**
+   * Teacher Manual Attendance Check-In (by Division & Roll Number)
+   */
+  static async manualMarkAttendance(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.user || (req.user.role !== 'teacher' && req.user.role !== 'admin')) {
+        res.status(403).json({
+          success: false,
+          error: 'TEACHER_ONLY',
+          message: 'Only teachers or administrators can manually mark attendance.',
+        });
+        return;
+      }
+
+      const { sessionId, division, rollNumber } = req.body;
+
+      if (!sessionId || typeof sessionId !== 'string') {
+        res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'Valid Session ID is required' });
+        return;
+      }
+
+      if (!division || typeof division !== 'string' || division.trim() === '') {
+        res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'Division is required (e.g. A1)' });
+        return;
+      }
+
+      if (!rollNumber || typeof rollNumber !== 'string' || rollNumber.trim() === '') {
+        res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'Roll Number is required (e.g. 86)' });
+        return;
+      }
+
+      const cleanDiv = division.trim().toUpperCase();
+      const cleanRoll = rollNumber.trim();
+
+      // 1. Fetch Student by Division and Roll Number
+      const studentRes = await query(
+        `SELECT id, enrollment_number, full_name, division, roll_number, group_name, status
+         FROM students
+         WHERE UPPER(division) = $1 AND (roll_number = $2 OR regexp_replace(roll_number, '\\D', '', 'g') = $2)`,
+        [cleanDiv, cleanRoll]
+      );
+
+      if (!studentRes.rows || studentRes.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: 'STUDENT_NOT_FOUND',
+          message: `No active student found in Division '${cleanDiv}' with Roll Number '${cleanRoll}'.`,
+        });
+        return;
+      }
+
+      const student = studentRes.rows[0];
+
+      // 2. Fetch Session Details
+      const sessionRes = await query(
+        `SELECT s.id, s.session_name, s.status, s.esp32_id, s.class_id
+         FROM attendance_sessions s
+         WHERE s.id = $1`,
+        [sessionId]
+      );
+
+      if (!sessionRes.rows || sessionRes.rows.length === 0) {
+        res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND', message: 'Session not found' });
+        return;
+      }
+
+      const session = sessionRes.rows[0];
+      if (session.status !== 'active') {
+        res.status(400).json({ success: false, error: 'SESSION_CLOSED', message: 'Session is no longer active.' });
+        return;
+      }
+
+      // 3. Upsert / Insert Attendance Record
+      const existingRes = await query(
+        'SELECT id, status FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+        [sessionId, student.id]
+      );
+
+      let recordId: string;
+      if (existingRes.rows && existingRes.rows.length > 0) {
+        const existing = existingRes.rows[0];
+        if (existing.status === 'present') {
+          res.status(409).json({
+            success: false,
+            error: 'ALREADY_MARKED',
+            message: `${student.full_name} (${student.division}-${student.roll_number}) is already marked Present.`,
+          });
+          return;
+        }
+
+        const updateRes = await query(
+          `UPDATE attendance_records
+           SET status = 'present', marked_at = NOW(), rejection_reason = NULL, device_info = 'MANUAL_TEACHER'
+           WHERE id = $1 RETURNING id`,
+          [existing.id]
+        );
+        recordId = updateRes.rows[0].id;
+      } else {
+        const insertRes = await query(
+          `INSERT INTO attendance_records (session_id, student_id, class_id, esp32_id, status, device_info, marked_at)
+           VALUES ($1, $2, $3, $4, 'present', 'MANUAL_TEACHER', NOW())
+           RETURNING id`,
+          [sessionId, student.id, session.class_id || null, session.esp32_id]
+        );
+        recordId = insertRes.rows[0].id;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: `✅ Marked Present for ${student.full_name} (Div: ${student.division}, Roll: ${student.roll_number})`,
+        recordId,
+        student: {
+          id: student.id,
+          full_name: student.full_name,
+          enrollment_number: student.enrollment_number,
+          division: student.division,
+          roll_number: student.roll_number,
+          group_name: student.group_name,
+        },
+      });
+    } catch (err: any) {
+      console.error('[AttendanceController.manualMarkAttendance]', err);
+      res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
+    }
+  }
 }

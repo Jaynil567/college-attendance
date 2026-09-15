@@ -18,4 +18,7 @@ router.get('/report', requireTeacherOrAdmin, AttendanceController.getAttendanceR
 // Teacher/Admin exports attendance to XLSX Excel file
 router.get('/export', requireTeacherOrAdmin, AttendanceController.exportExcel);
 
+// Teacher/Admin manual attendance check-in (by Division & Roll Number)
+router.post('/manual-mark', requireTeacherOrAdmin, AttendanceController.manualMarkAttendance);
+
 export default router;
