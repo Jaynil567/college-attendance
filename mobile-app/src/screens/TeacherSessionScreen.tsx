@@ -11,7 +11,7 @@ import {
   RefreshControl,
   Linking,
 } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { useMobileAuth } from '../context/AuthContext';
