@@ -56,6 +56,7 @@ export const ApiService = {
   // Sessions
   getAuditoriumsStatus: () => api.get('/sessions/auditoriums-status'),
   getActiveSessions: () => api.get('/sessions/active'),
+  getAllSessions: () => api.get('/sessions/all'),
   getSessionById: (id: string) => api.get(`/sessions/${id}`),
   startSession: (data: { auditoriumId?: string; subject?: string; targetDivisions?: string[]; classId?: string; esp32Id?: string; sessionName?: string; durationMinutes?: number }) =>
     api.post('/sessions/start', data),

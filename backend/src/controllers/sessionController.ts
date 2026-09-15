@@ -330,4 +330,42 @@ export class SessionController {
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
     }
   }
+
+  /**
+   * Get all attendance sessions (active and closed)
+   */
+  static async getAllSessions(req: Request, res: Response): Promise<void> {
+    try {
+      const { status, limit = 100 } = req.query;
+      let sql = `
+        SELECT s.*, 
+               t.full_name as teacher_name,
+               COUNT(ar.id)::int as present_count
+        FROM attendance_sessions s
+        LEFT JOIN users t ON s.created_by = t.id
+        LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.status = 'present'
+        WHERE 1=1
+      `;
+      const params: any[] = [];
+
+      if (status && typeof status === 'string') {
+        params.push(status);
+        sql += ` AND s.status = $${params.length}`;
+      }
+
+      sql += ` GROUP BY s.id, t.full_name ORDER BY s.start_time DESC LIMIT $${params.length + 1}`;
+      params.push(Number(limit));
+
+      const result = await query(sql, params);
+
+      res.status(200).json({
+        success: true,
+        count: result.rows.length,
+        sessions: result.rows || [],
+      });
+    } catch (err: any) {
+      console.error('[SessionController.getAllSessions]', err);
+      res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
+    }
+  }
 }

@@ -9,6 +9,7 @@ router.use(authenticateToken);
 // Students and teachers can query active sessions and 3-Auditorium real-time status
 router.get('/auditoriums-status', SessionController.getAuditoriumsStatus);
 router.get('/active', SessionController.getActiveSessions);
+router.get('/all', SessionController.getAllSessions);
 router.get('/:id', SessionController.getSessionById);
 
 // Teacher/Admin can control session lifecycle
