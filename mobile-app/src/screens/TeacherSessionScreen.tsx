@@ -104,10 +104,19 @@ export const TeacherSessionScreen: React.FC = () => {
           fetchSessionRecords(activeSession.id);
         }
       }, 3000);
+      // Ensure BLE advertising is running
+      const bleUuid = AUDITORIUM_BLE_UUIDS[selectedAudiId];
+      if (bleUuid) {
+        BleService.startAdvertising(bleUuid).then((bleRes) => {
+          setBleActive(bleRes.success);
+        });
+      }
     } else {
       setElapsedSeconds(0);
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollRef.current) clearInterval(pollRef.current);
+      BleService.stopAdvertising();
+      setBleActive(false);
     }
 
     return () => {
@@ -150,10 +159,10 @@ export const TeacherSessionScreen: React.FC = () => {
         // Start BLE beacon broadcasting for this auditorium
         const bleUuid = AUDITORIUM_BLE_UUIDS[selectedAudiId];
         if (bleUuid) {
-          const bleStarted = await BleService.startAdvertising(bleUuid);
-          setBleActive(bleStarted);
-          if (!bleStarted) {
-            Alert.alert('BLE Warning', 'Could not start BLE beacon. Students may not be able to verify proximity. Make sure Bluetooth is enabled.');
+          const bleRes = await BleService.startAdvertising(bleUuid);
+          setBleActive(bleRes.success);
+          if (!bleRes.success) {
+            Alert.alert('BLE Warning', `Could not start BLE beacon: ${bleRes.error || 'Unknown error'}. Students may not be able to verify proximity.`);
           }
         }
 

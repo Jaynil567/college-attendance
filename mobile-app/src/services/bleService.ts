@@ -51,23 +51,23 @@ export class BleService {
    * Start BLE advertising with the auditorium's service UUID.
    * Teacher's phone becomes a BLE beacon that students can detect.
    */
-  public static async startAdvertising(serviceUuid: string): Promise<boolean> {
+  public static async startAdvertising(serviceUuid: string): Promise<{ success: boolean; error?: string }> {
     const hasPermission = await this.requestPermissions();
     if (!hasPermission) {
       console.error('[BLE] Permissions denied for advertising');
-      return false;
+      return { success: false, error: 'Permissions (BLUETOOTH_ADVERTISE/SCAN/LOCATION) denied.' };
     }
 
     try {
       const BLEAdvertiser = require('react-native-ble-advertiser');
       
-      // Set company ID (using 0x004C for general purpose)
+      // Set company ID (using 0x004C for Apple/general purpose)
       BLEAdvertiser.setCompanyId(0x004C);
 
       // Start broadcasting the auditorium UUID
       await BLEAdvertiser.broadcast(serviceUuid, [], {
-        advertiseMode: 2,       // ADVERTISE_MODE_LOW_LATENCY (most frequent)
-        txPowerLevel: 3,        // ADVERTISE_TX_POWER_HIGH (max range)
+        advertiseMode: 2,       // ADVERTISE_MODE_LOW_LATENCY
+        txPowerLevel: 3,        // ADVERTISE_TX_POWER_HIGH
         connectable: false,
         includeDeviceName: false,
         includeTxPowerLevel: false,
@@ -75,11 +75,12 @@ export class BleService {
 
       this._isAdvertising = true;
       console.log('[BLE] Teacher advertising started:', serviceUuid);
-      return true;
+      return { success: true };
     } catch (err: any) {
-      console.error('[BLE] Failed to start advertising:', err.message);
+      const errMsg = err?.message || err?.toString() || 'Unknown BLE Advertiser error';
+      console.error('[BLE] Failed to start advertising:', errMsg);
       this._isAdvertising = false;
-      return false;
+      return { success: false, error: errMsg };
     }
   }
 
