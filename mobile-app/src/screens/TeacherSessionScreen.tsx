@@ -9,9 +9,10 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Linking,
 } from 'react-native';
 import { useMobileAuth } from '../context/AuthContext';
-import { MobileApiService } from '../services/api';
+import { MobileApiService, DEFAULT_API_URL } from '../services/api';
 import { BleService } from '../services/bleService';
 
 const AUDITORIUM_OPTIONS = [
@@ -178,6 +179,16 @@ export const TeacherSessionScreen: React.FC = () => {
     }
   };
 
+  const handleDownloadSheet = async () => {
+    if (!activeSession?.id) return;
+    const url = `${DEFAULT_API_URL}/attendance/export?sessionId=${activeSession.id}`;
+    try {
+      await Linking.openURL(url);
+    } catch (err: any) {
+      Alert.alert('Download Failed', err.message || 'Could not download attendance sheet.');
+    }
+  };
+
   const handleEndSession = async () => {
     if (!activeSession) return;
 
@@ -334,6 +345,14 @@ export const TeacherSessionScreen: React.FC = () => {
                 ))
               )}
             </View>
+
+            {/* Download Attendance Sheet Button */}
+            <TouchableOpacity
+              style={styles.downloadSheetBtn}
+              onPress={handleDownloadSheet}
+            >
+              <Text style={styles.downloadSheetBtnText}>📥 Download Attendance Sheet (.xlsx)</Text>
+            </TouchableOpacity>
 
             {/* End Session Button */}
             <TouchableOpacity
@@ -743,12 +762,24 @@ const styles = StyleSheet.create({
     color: '#059669',
     marginTop: 2,
   },
+  downloadSheetBtn: {
+    backgroundColor: '#0284C7',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  downloadSheetBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   endSessionBtn: {
     backgroundColor: '#DC2626',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   endSessionBtnText: {
     color: '#FFFFFF',

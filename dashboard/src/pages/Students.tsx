@@ -13,6 +13,8 @@ export const Students: React.FC<{
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClassFilter, setSelectedClassFilter] = useState('');
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState('');
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(initialAddModalOpen);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentEditStudent, setCurrentEditStudent] = useState<Student | null>(null);
@@ -36,7 +38,9 @@ export const Students: React.FC<{
       const res = await ApiService.getStudents({
         search: searchQuery || undefined,
         classId: selectedClassFilter || undefined,
-      });
+        division: selectedDivisionFilter || undefined,
+        groupName: selectedGroupFilter || undefined,
+      } as any);
       if (res.data.success) {
         setStudents(res.data.students || []);
       }
@@ -49,7 +53,7 @@ export const Students: React.FC<{
 
   useEffect(() => {
     fetchStudents();
-  }, [selectedClassFilter]);
+  }, [selectedClassFilter, selectedDivisionFilter, selectedGroupFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,18 +140,23 @@ export const Students: React.FC<{
   const handleDownloadCredentials = async () => {
     try {
       const response = await api.get('/students/export-credentials', {
+        params: {
+          search: searchQuery || undefined,
+          division: selectedDivisionFilter || undefined,
+          groupName: selectedGroupFilter || undefined,
+        },
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `Student_Credentials_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      link.setAttribute('download', `Student_Details_${new Date().toISOString().slice(0, 10)}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to download credentials');
+      alert(err.response?.data?.message || 'Failed to download student details');
     }
   };
 
@@ -158,7 +167,7 @@ export const Students: React.FC<{
       const res = await api.post('/students/reset-all-passwords');
       if (res.data.success) {
         alert(`✅ Passwords reset for ${res.data.count} students. Download the credentials sheet to see new passwords.`);
-        fetchStudents(); // Refresh to show new passwords
+        fetchStudents();
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to reset passwords');
@@ -197,7 +206,7 @@ export const Students: React.FC<{
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900">Student Directory</h2>
           <p className="text-xs text-slate-500">
-            Authoritative registry. Self-registration is strictly blocked. Admin/Teacher provisions access.
+            Authoritative registry sorted by enrollment number with division, roll number & group filters.
           </p>
         </div>
 
@@ -207,7 +216,7 @@ export const Students: React.FC<{
             className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"
           >
             <Download className="w-4 h-4" />
-            <span>Download Credentials</span>
+            <span>Download Sheet</span>
           </button>
           
           <button
@@ -216,7 +225,7 @@ export const Students: React.FC<{
             className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${resettingPasswords ? 'animate-spin' : ''}`} />
-            <span>{resettingPasswords ? 'Resetting...' : 'Reset All Passwords'}</span>
+            <span>{resettingPasswords ? 'Resetting...' : 'Reset Passwords'}</span>
           </button>
 
           <button
@@ -232,31 +241,42 @@ export const Students: React.FC<{
         </div>
       </div>
 
-      {/* Search & Class Filters */}
+      {/* Search & Division / Group Filters */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-        <form onSubmit={handleSearchSubmit} className="w-full md:w-96 relative">
+        <form onSubmit={handleSearchSubmit} className="w-full md:w-80 relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by enrollment number or student name..."
+            placeholder="Search by enrollment, name..."
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </form>
 
-        <div className="flex items-center space-x-3 w-full md:w-auto">
-          <Filter className="w-4 h-4 text-slate-400" />
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <select
+              value={selectedDivisionFilter}
+              onChange={(e) => setSelectedDivisionFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Divisions</option>
+              {['A1','A2','A3','A4','A5','A6','A7','A8','A9','B1','B2','B3','B4','B5','B6','B7','B8','B9','C1','C2','C3','C4','C5','C6','C7','C8','C9'].map((div) => (
+                <option key={div} value={div}>Division {div}</option>
+              ))}
+            </select>
+          </div>
+
           <select
-            value={selectedClassFilter}
-            onChange={(e) => setSelectedClassFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={selectedGroupFilter}
+            onChange={(e) => setSelectedGroupFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">All Assigned Classes</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.class_name} • {c.subject} (Sem {c.semester}-{c.division})
-              </option>
+            <option value="">All Groups</option>
+            {['G1','G2','G3'].map((grp) => (
+              <option key={grp} value={grp}>Group {grp}</option>
             ))}
           </select>
         </div>
@@ -266,7 +286,7 @@ export const Students: React.FC<{
       <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <h4 className="font-bold text-slate-900">Enrolled Students ({students.length})</h4>
-          <span className="text-xs text-slate-400">Searchable by Unique Enrollment ID</span>
+          <span className="text-xs text-slate-400">Sorted by Enrollment Number</span>
         </div>
 
         {students.length === 0 ? (
@@ -278,11 +298,12 @@ export const Students: React.FC<{
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3.5">Enrollment No</th>
-                  <th className="px-6 py-3.5">Full Name</th>
-                  <th className="px-6 py-3.5">Password (App Login)</th>
-                  <th className="px-6 py-3.5">Email / Phone</th>
-                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">Enrollment Number</th>
+                  <th className="px-6 py-3.5">Name Of Student</th>
+                  <th className="px-6 py-3.5">Division</th>
+                  <th className="px-6 py-3.5">Roll Number</th>
+                  <th className="px-6 py-3.5">Group</th>
+                  <th className="px-6 py-3.5">Password</th>
                   <th className="px-6 py-3.5">Device</th>
                   <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
@@ -292,37 +313,26 @@ export const Students: React.FC<{
                   <tr key={st.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-6 py-3.5 font-mono font-bold text-blue-600">{st.enrollment_number}</td>
                     <td className="px-6 py-3.5 font-semibold text-slate-900">{st.full_name}</td>
+                    <td className="px-6 py-3.5 font-bold text-slate-700">{st.division || '-'}</td>
+                    <td className="px-6 py-3.5 font-mono text-slate-700">{st.roll_number || '-'}</td>
+                    <td className="px-6 py-3.5">
+                      <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-bold text-slate-700">
+                        {st.group_name || '-'}
+                      </span>
+                    </td>
                     <td className="px-6 py-3.5">
                       <div className="inline-flex items-center space-x-2 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
                         <span className="font-mono text-xs font-semibold text-slate-800">
-                          {showPasswordMap[st.id] ? (st.plain_password || 'student123') : '••••••••'}
+                          {showPasswordMap[st.id] ? (st.plain_password || '••••') : '••••••••'}
                         </span>
                         <button
                           type="button"
                           onClick={() => setShowPasswordMap((prev) => ({ ...prev, [st.id]: !prev[st.id] }))}
                           className="text-slate-400 hover:text-blue-600 transition-colors"
-                          title={showPasswordMap[st.id] ? 'Hide password' : 'Show password'}
                         >
                           {showPasswordMap[st.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                       </div>
-                    </td>
-                    <td className="px-6 py-3.5 text-xs text-slate-500">
-                      <div>{st.email || 'No email'}</div>
-                      <div className="text-[11px] text-slate-400">{st.phone_number || 'No phone'}</div>
-                    </td>
-                    <td className="px-6 py-3.5">
-                      {st.status === 'active' ? (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Active</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-xs font-bold border border-red-200">
-                          <XCircle className="w-3 h-3" />
-                          <span>Inactive</span>
-                        </span>
-                      )}
                     </td>
                     <td className="px-6 py-3.5">
                       {st.device_id ? (

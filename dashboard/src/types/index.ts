@@ -31,6 +31,8 @@ export interface Student {
   subject?: string;
   semester?: string;
   division?: string;
+  roll_number?: string;
+  group_name?: string;
   status: 'active' | 'inactive';
   device_id?: string | null;
   created_at: string;

@@ -284,69 +284,94 @@ export class AttendanceController {
    */
   static async exportExcel(req: Request, res: Response): Promise<void> {
     try {
-      const { classId, sessionId, startDate, endDate } = req.query;
+      const { classId, sessionId, startDate, endDate, division, groupName } = req.query;
 
-      let sql = `
-        SELECT ar.id, ar.marked_at, ar.status, ar.rssi_dbm,
-               st.enrollment_number, st.full_name as student_name,
-               c.class_name, c.subject, c.semester, c.division,
-               s.session_name, s.auditorium_name, d.esp32_id
-        FROM attendance_records ar
-        JOIN students st ON ar.student_id = st.id
-        LEFT JOIN classes c ON ar.class_id = c.id
-        JOIN attendance_sessions s ON ar.session_id = s.id
-        LEFT JOIN esp32_devices d ON ar.esp32_id = d.id
-        WHERE 1=1
-      `;
-      const params: any[] = [];
+      let result;
+      let sessionName = 'Attendance Session';
+      let auditoriumName = 'Auditorium';
 
       if (sessionId && typeof sessionId === 'string') {
-        params.push(sessionId);
-        sql += ` AND ar.session_id = $${params.length}`;
+        const sessRes = await query(`SELECT session_name, auditorium_name FROM attendance_sessions WHERE id = $1`, [sessionId]);
+        if (sessRes.rows && sessRes.rows.length > 0) {
+          sessionName = sessRes.rows[0].session_name;
+          auditoriumName = sessRes.rows[0].auditorium_name || 'Auditorium';
+        }
+
+        // Query ALL students for this session, showing PRESENT or ABSENT
+        let sql = `
+          SELECT st.enrollment_number, st.full_name as student_name,
+                 COALESCE(st.division, 'N/A') as division,
+                 COALESCE(st.roll_number, 'N/A') as roll_number,
+                 COALESCE(st.group_name, 'N/A') as group_name,
+                 CASE WHEN ar.id IS NOT NULL THEN COALESCE(ar.status, 'PRESENT') ELSE 'ABSENT' END as status,
+                 ar.marked_at
+          FROM students st
+          LEFT JOIN attendance_records ar ON ar.student_id = st.id AND ar.session_id = $1
+          WHERE st.status = 'active'
+        `;
+        const params: any[] = [sessionId];
+
+        if (division && typeof division === 'string' && division.trim() !== '') {
+          params.push(division.trim());
+          sql += ` AND st.division = $${params.length}`;
+        }
+        if (groupName && typeof groupName === 'string' && groupName.trim() !== '') {
+          params.push(groupName.trim());
+          sql += ` AND st.group_name = $${params.length}`;
+        }
+
+        sql += ` ORDER BY st.enrollment_number ASC`;
+        result = await query(sql, params);
+      } else {
+        let sql = `
+          SELECT ar.id, ar.marked_at, ar.status,
+                 st.enrollment_number, st.full_name as student_name,
+                 COALESCE(st.division, 'N/A') as division,
+                 COALESCE(st.roll_number, 'N/A') as roll_number,
+                 COALESCE(st.group_name, 'N/A') as group_name,
+                 s.session_name, s.auditorium_name
+          FROM attendance_records ar
+          JOIN students st ON ar.student_id = st.id
+          JOIN attendance_sessions s ON ar.session_id = s.id
+          WHERE 1=1
+        `;
+        const params: any[] = [];
+
+        if (classId && typeof classId === 'string') {
+          params.push(classId);
+          sql += ` AND ar.class_id = $${params.length}`;
+        }
+        if (startDate && typeof startDate === 'string') {
+          params.push(new Date(startDate));
+          sql += ` AND ar.marked_at >= $${params.length}`;
+        }
+        if (endDate && typeof endDate === 'string') {
+          params.push(new Date(endDate));
+          sql += ` AND ar.marked_at <= $${params.length}`;
+        }
+
+        sql += ` ORDER BY ar.marked_at DESC, st.enrollment_number ASC`;
+        result = await query(sql, params);
       }
-
-      if (classId && typeof classId === 'string') {
-        params.push(classId);
-        sql += ` AND ar.class_id = $${params.length}`;
-      }
-
-      if (startDate && typeof startDate === 'string') {
-        params.push(new Date(startDate));
-        sql += ` AND ar.marked_at >= $${params.length}`;
-      }
-
-      if (endDate && typeof endDate === 'string') {
-        params.push(new Date(endDate));
-        sql += ` AND ar.marked_at <= $${params.length}`;
-      }
-
-      sql += ` ORDER BY ar.marked_at DESC, st.enrollment_number ASC`;
-
-      const result = await query(sql, params);
 
       const exportRows: AttendanceExportRow[] = (result.rows || []).map((row: any) => ({
         enrollmentNumber: row.enrollment_number,
         studentName: row.student_name,
-        className: row.class_name || row.auditorium_name || 'Auditorium Session',
-        subject: row.subject || row.session_name || 'Lecture',
-        semester: row.semester || 1,
-        division: row.division || 'A',
-        sessionName: row.session_name,
-        markedAt: row.marked_at,
+        division: row.division || 'N/A',
+        rollNumber: row.roll_number || 'N/A',
+        groupName: row.group_name || 'N/A',
         status: row.status,
-        esp32Id: row.esp32_id,
-        rssi: row.rssi_dbm,
+        markedAt: row.marked_at,
       }));
 
-      const firstRow = result.rows[0];
       const buffer = await ExcelService.generateAttendanceWorkbook({
-        className: firstRow?.class_name || firstRow?.auditorium_name || 'Auditorium Attendance',
-        subject: firstRow?.subject || firstRow?.session_name || 'Attendance Log',
-        dateRange: startDate && endDate ? `${startDate} to ${endDate}` : 'Recorded Session',
+        className: auditoriumName,
+        subject: sessionName,
+        dateRange: startDate && endDate ? `${startDate} to ${endDate}` : 'Lecture Attendance',
         records: exportRows,
       });
 
-      const filename = `Attendance_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `Attendance_Sheet_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

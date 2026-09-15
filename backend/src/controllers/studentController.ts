@@ -85,12 +85,12 @@ export class StudentController {
    */
   static async getStudents(req: Request, res: Response): Promise<void> {
     try {
-      const { search, classId, status } = req.query;
+      const { search, classId, status, division, groupName, group } = req.query;
 
       let sql = `
-        SELECT s.id, s.enrollment_number, s.full_name, s.email, s.phone_number,
-               s.plain_password, s.status, s.created_at, s.updated_at,
-               c.id as class_id, c.class_name, c.subject, c.semester, c.division
+        SELECT s.id, s.enrollment_number, s.full_name, s.division, s.roll_number, s.group_name,
+               s.email, s.phone_number, s.plain_password, s.status, s.device_id, s.created_at, s.updated_at,
+               c.id as class_id, c.class_name, c.subject, c.semester
         FROM students s
         LEFT JOIN classes c ON s.class_id = c.id
         WHERE 1=1
@@ -99,7 +99,7 @@ export class StudentController {
 
       if (search && typeof search === 'string' && search.trim() !== '') {
         params.push(`%${search.trim().toUpperCase()}%`);
-        sql += ` AND (UPPER(s.enrollment_number) LIKE $${params.length} OR UPPER(s.full_name) LIKE $${params.length})`;
+        sql += ` AND (UPPER(s.enrollment_number) LIKE $${params.length} OR UPPER(s.full_name) LIKE $${params.length} OR UPPER(COALESCE(s.division, '')) LIKE $${params.length} OR UPPER(COALESCE(s.group_name, '')) LIKE $${params.length})`;
       }
 
       if (classId && typeof classId === 'string' && classId.trim() !== '') {
@@ -110,6 +110,17 @@ export class StudentController {
       if (status && (status === 'active' || status === 'inactive')) {
         params.push(status);
         sql += ` AND s.status = $${params.length}`;
+      }
+
+      if (division && typeof division === 'string' && division.trim() !== '') {
+        params.push(division.trim());
+        sql += ` AND s.division = $${params.length}`;
+      }
+
+      const targetGroup = groupName || group;
+      if (targetGroup && typeof targetGroup === 'string' && targetGroup.trim() !== '') {
+        params.push(targetGroup.trim());
+        sql += ` AND s.group_name = $${params.length}`;
       }
 
       sql += ` ORDER BY s.enrollment_number ASC`;
@@ -281,19 +292,43 @@ export class StudentController {
    */
   static async exportCredentials(req: Request, res: Response): Promise<void> {
     try {
-      const result = await query(
-        'SELECT enrollment_number, full_name, plain_password FROM students ORDER BY enrollment_number ASC'
-      );
+      const { division, groupName, group, search } = req.query;
+
+      let sql = `SELECT enrollment_number, full_name, division, roll_number, group_name, plain_password FROM students WHERE 1=1`;
+      const params: any[] = [];
+
+      if (search && typeof search === 'string' && search.trim() !== '') {
+        params.push(`%${search.trim().toUpperCase()}%`);
+        sql += ` AND (UPPER(enrollment_number) LIKE $${params.length} OR UPPER(full_name) LIKE $${params.length})`;
+      }
+
+      if (division && typeof division === 'string' && division.trim() !== '') {
+        params.push(division.trim());
+        sql += ` AND division = $${params.length}`;
+      }
+
+      const targetGroup = groupName || group;
+      if (targetGroup && typeof targetGroup === 'string' && targetGroup.trim() !== '') {
+        params.push(targetGroup.trim());
+        sql += ` AND group_name = $${params.length}`;
+      }
+
+      sql += ` ORDER BY enrollment_number ASC`;
+
+      const result = await query(sql, params);
 
       const ExcelJS = (await import('exceljs')).default;
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Credentials');
+      const worksheet = workbook.addWorksheet('Student Details');
 
       worksheet.columns = [
-        { header: 'Sr. No', key: 'srNo', width: 10 },
-        { header: 'Enrollment Number', key: 'enrollment', width: 25 },
-        { header: 'Student Name', key: 'name', width: 30 },
-        { header: 'Password', key: 'password', width: 15 },
+        { header: 'Sr. No', key: 'srNo', width: 8 },
+        { header: 'Enrollment Number', key: 'enrollment', width: 22 },
+        { header: 'Name Of Student', key: 'name', width: 32 },
+        { header: 'Division', key: 'division', width: 12 },
+        { header: 'Roll Number', key: 'rollNumber', width: 14 },
+        { header: 'Group', key: 'group', width: 12 },
+        { header: 'Password', key: 'password', width: 14 },
       ];
 
       result.rows.forEach((student: any, index: number) => {
@@ -301,12 +336,15 @@ export class StudentController {
           srNo: index + 1,
           enrollment: student.enrollment_number,
           name: student.full_name,
+          division: student.division || 'N/A',
+          rollNumber: student.roll_number || 'N/A',
+          group: student.group_name || 'N/A',
           password: student.plain_password,
         });
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const filename = `Student_Credentials_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `Student_Details_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
