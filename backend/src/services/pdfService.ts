@@ -12,14 +12,14 @@ export interface StudentPdfRow {
 
 export class PdfService {
   /**
-   * Generates a clean, print-ready PDF for student credentials
+   * Generates a compact, high-density A4 Portrait PDF for printing maximum students per page (~50+ students/page)
    */
   static generateCredentialsPdf(students: StudentPdfRow[]): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({
         size: 'A4',
-        layout: 'landscape',
-        margin: 30,
+        layout: 'portrait',
+        margin: 20,
         bufferPages: true,
       });
 
@@ -28,34 +28,34 @@ export class PdfService {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', (err) => reject(err));
 
-      const pageWidth = 841.89;
-      const pageHeight = 595.28;
-      const margin = 30;
-      const contentWidth = pageWidth - margin * 2; // 781.89
+      const pageWidth = 595.28;
+      const pageHeight = 841.89;
+      const margin = 20;
+      const contentWidth = pageWidth - margin * 2; // 555.28
 
-      // Column widths (Total = 781)
-      const colWidths = [40, 60, 60, 70, 160, 260, 131];
-      const colHeaders = ['Sr. No', 'Group', 'Division', 'Roll No', 'Enrollment Number', 'Student Name', 'Password'];
+      // Column widths (Total = 555pt)
+      const colWidths = [28, 38, 38, 42, 110, 204, 95];
+      const colHeaders = ['#', 'Group', 'Div', 'Roll', 'Enrollment No', 'Student Name', 'Password'];
 
       const drawHeader = () => {
-        // Title Banner
-        doc.rect(margin, 25, contentWidth, 32).fill('#059669');
-        doc.fillColor('#FFFFFF').fontSize(14).font('Helvetica-Bold')
-           .text('COLLEGE STUDENT CREDENTIALS DIRECTORY', margin, 34, { width: contentWidth, align: 'center' });
+        // Compact Title Banner
+        doc.rect(margin, 15, contentWidth, 22).fill('#059669');
+        doc.fillColor('#FFFFFF').fontSize(11).font('Helvetica-Bold')
+           .text('COLLEGE STUDENT CREDENTIALS DIRECTORY', margin, 21, { width: contentWidth, align: 'center' });
 
         // Subtitle
-        doc.fillColor('#4B5563').fontSize(9).font('Helvetica-Oblique')
-           .text(`Generated: ${new Date().toLocaleString()} | Total Students: ${students.length} | Sorted by Group -> Division -> Roll Number`, margin, 62, { width: contentWidth, align: 'center' });
+        doc.fillColor('#374151').fontSize(7.5).font('Helvetica-Oblique')
+           .text(`Generated: ${new Date().toLocaleString()} | Total: ${students.length} Students | Order: Group -> Division -> Roll No`, margin, 41, { width: contentWidth, align: 'center' });
 
         // Table Header Row
-        const y = 80;
-        doc.rect(margin, y, contentWidth, 24).fill('#1E293B');
+        const y = 54;
+        doc.rect(margin, y, contentWidth, 16).fill('#1E293B');
 
         let currentX = margin;
         colHeaders.forEach((header, i) => {
-          doc.fillColor('#FFFFFF').fontSize(9).font('Helvetica-Bold')
-             .text(header, currentX + 4, y + 7, {
-               width: colWidths[i] - 8,
+          doc.fillColor('#FFFFFF').fontSize(8).font('Helvetica-Bold')
+             .text(header, currentX + 2, y + 4, {
+               width: colWidths[i] - 4,
                align: i < 4 || i === 6 ? 'center' : 'left',
              });
           currentX += colWidths[i];
@@ -64,15 +64,15 @@ export class PdfService {
 
       drawHeader();
 
-      let currentY = 104;
-      const rowHeight = 20;
-      const maxY = pageHeight - 40;
+      let currentY = 70;
+      const rowHeight = 14;
+      const maxY = pageHeight - 25;
 
       students.forEach((st, idx) => {
         if (currentY + rowHeight > maxY) {
           doc.addPage();
           drawHeader();
-          currentY = 104;
+          currentY = 70;
         }
 
         // Alternating row background
@@ -80,8 +80,10 @@ export class PdfService {
           doc.rect(margin, currentY, contentWidth, rowHeight).fill('#F8FAFC');
         }
 
-        // Row border
-        doc.rect(margin, currentY, contentWidth, rowHeight).strokeColor('#CBD5E1').stroke();
+        // Lightweight horizontal border line
+        doc.moveTo(margin, currentY + rowHeight)
+           .lineTo(margin + contentWidth, currentY + rowHeight)
+           .strokeColor('#E2E8F0').lineWidth(0.5).stroke();
 
         let currentX = margin;
         const rowVals = [
@@ -95,9 +97,9 @@ export class PdfService {
         ];
 
         rowVals.forEach((val, i) => {
-          doc.fillColor('#0F172A').fontSize(8.5).font(i === 4 || i === 6 ? 'Helvetica-Bold' : 'Helvetica')
-             .text(val, currentX + 4, currentY + 5, {
-               width: colWidths[i] - 8,
+          doc.fillColor('#0F172A').fontSize(7.5).font(i === 4 || i === 6 ? 'Helvetica-Bold' : 'Helvetica')
+             .text(val, currentX + 2, currentY + 3, {
+               width: colWidths[i] - 4,
                align: i < 4 || i === 6 ? 'center' : 'left',
                lineBreak: false,
                ellipsis: true,
@@ -112,8 +114,8 @@ export class PdfService {
       const range = doc.bufferedPageRange();
       for (let i = range.start; i < range.start + range.count; i++) {
         doc.switchToPage(i);
-        doc.fillColor('#64748B').fontSize(8).font('Helvetica')
-           .text(`Page ${i + 1} of ${range.count}`, margin, pageHeight - 25, { width: contentWidth, align: 'center' });
+        doc.fillColor('#64748B').fontSize(7.5).font('Helvetica')
+           .text(`Page ${i + 1} of ${range.count}`, margin, pageHeight - 18, { width: contentWidth, align: 'center' });
       }
 
       doc.end();
