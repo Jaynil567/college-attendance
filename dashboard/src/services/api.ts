@@ -78,7 +78,17 @@ export const ApiService = {
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = downloadUrl;
-    link.download = `Attendance_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+    let filename = `Attendance_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const contentDisposition = response.headers?.['content-disposition'] || response.headers?.['Content-Disposition'];
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^";]+)"?/);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+    }
+
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     link.remove();

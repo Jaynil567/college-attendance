@@ -38,7 +38,7 @@ const ALL_DIVISIONS = [
 ];
 
 export const TeacherSessionScreen: React.FC = () => {
-  const { teacher, logout } = useMobileAuth();
+  const { teacher, token, logout } = useMobileAuth();
   const [selectedAudiId, setSelectedAudiId] = useState<'AUDITORIUM_01' | 'AUDITORIUM_02' | 'AUDITORIUM_03'>('AUDITORIUM_01');
   const [subjectTitle, setSubjectTitle] = useState('');
   const [selectedDivisions, setSelectedDivisions] = useState<string[]>(['A1']);
@@ -217,7 +217,12 @@ export const TeacherSessionScreen: React.FC = () => {
 
     try {
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-      const downloadResult = await FileSystem.downloadAsync(url, fileUri);
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const downloadResult = await FileSystem.downloadAsync(url, fileUri, { headers });
 
       if (downloadResult.status === 200) {
         const canShare = await Sharing.isAvailableAsync();
@@ -231,15 +236,11 @@ export const TeacherSessionScreen: React.FC = () => {
           await WebBrowser.openBrowserAsync(url);
         }
       } else {
-        await WebBrowser.openBrowserAsync(url);
+        Alert.alert('Download Error', `Server returned status ${downloadResult.status}. Make sure you are logged in.`);
       }
     } catch (err: any) {
-      console.warn('[TeacherSession] FileSystem download failed, trying WebBrowser fallback', err);
-      try {
-        await WebBrowser.openBrowserAsync(url);
-      } catch (browserErr: any) {
-        Alert.alert('Download Failed', 'Could not open attendance download link in browser.');
-      }
+      console.warn('[TeacherSession] FileSystem download failed', err);
+      Alert.alert('Download Failed', err.message || 'Could not download attendance sheet.');
     }
   };
 
