@@ -4,10 +4,17 @@
     "slug": "college-classroom-attendance",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "edu.college.attendance",
+      "icon": "./assets/icon.png",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "College Attendance uses Bluetooth Low Energy to verify your physical presence in the auditorium.",
         "NSBluetoothPeripheralUsageDescription": "Required for teachers to broadcast BLE beacon during attendance sessions.",
@@ -16,6 +23,10 @@
     },
     "android": {
       "package": "edu.college.attendance",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",

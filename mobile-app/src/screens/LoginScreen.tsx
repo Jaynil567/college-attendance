@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { useMobileAuth } from '../context/AuthContext';
 import { DEFAULT_API_URL, setApiBaseUrl, mobileApi } from '../services/api';
 
@@ -50,6 +50,10 @@ export const LoginScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
+        {/* LJIET University Official Logo */}
+        <View style={styles.logoHeader}>
+          <Image source={require('../../assets/ljiet_logo.png')} style={styles.logoImage} resizeMode="contain" />
+        </View>
         {/* Role Toggle Selector */}
         <View style={styles.roleSelectorContainer}>
           <TouchableOpacity
@@ -260,6 +264,15 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 20,
+  },
+  logoHeader: {
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
   },
   badge: {
     backgroundColor: '#DBEAFE',
