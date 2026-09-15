@@ -40,8 +40,12 @@ export const HistoryScreen: React.FC = () => {
             <Text style={styles.statLbl}>Present</Text>
           </View>
           <View style={styles.statCard}>
+            <Text style={[styles.statVal, styles.absentVal]}>{stats.absentCount || 0}</Text>
+            <Text style={styles.statLbl}>Absent</Text>
+          </View>
+          <View style={styles.statCard}>
             <Text style={styles.statVal}>{stats.totalSessions}</Text>
-            <Text style={styles.statLbl}>Total Classes</Text>
+            <Text style={styles.statLbl}>Total Lectures</Text>
           </View>
         </View>
       )}
@@ -49,12 +53,12 @@ export const HistoryScreen: React.FC = () => {
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="small" color="#2563EB" />
-          <Text style={styles.centerText}>Loading attendance ledger...</Text>
+          <Text style={styles.centerText}>Loading division attendance history...</Text>
         </View>
       ) : records.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyTitle}>No Attendance Records Yet</Text>
-          <Text style={styles.emptySub}>Your attendance check-ins will be logged here once recorded.</Text>
+          <Text style={styles.emptyTitle}>No Lecture Sessions Conducted Yet</Text>
+          <Text style={styles.emptySub}>All completed lectures for your division will automatically appear here.</Text>
           <TouchableOpacity style={styles.refreshBtn} onPress={fetchHistory}>
             <Text style={styles.refreshBtnText}>Refresh</Text>
           </TouchableOpacity>
@@ -67,12 +71,12 @@ export const HistoryScreen: React.FC = () => {
           renderItem={({ item }) => {
             const isPresent = item.status === 'present';
             return (
-              <View style={styles.recordCard}>
+              <View style={[styles.recordCard, !isPresent && styles.absentRecordCard]}>
                 <View style={styles.recordHeader}>
-                  <Text style={styles.recordSubject}>{item.subject || 'Lecture'}</Text>
-                  <View style={[styles.statusPill, isPresent ? styles.presentPill : styles.rejectedPill]}>
-                    <Text style={[styles.statusText, isPresent ? styles.presentText : styles.rejectedText]}>
-                      {isPresent ? 'PRESENT' : 'REJECTED'}
+                  <Text style={styles.recordSubject}>{item.subject || item.className || 'Lecture'}</Text>
+                  <View style={[styles.statusPill, isPresent ? styles.presentPill : styles.absentPill]}>
+                    <Text style={[styles.statusText, isPresent ? styles.presentText : styles.absentText]}>
+                      {isPresent ? 'PRESENT ✅' : 'ABSENT ❌'}
                     </Text>
                   </View>
                 </View>
@@ -83,7 +87,7 @@ export const HistoryScreen: React.FC = () => {
                   <Text style={styles.recordTime}>
                     {new Date(item.marked_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                   </Text>
-                  <Text style={styles.recordNode}>ESP32: {item.esp32_id}</Text>
+                  <Text style={styles.recordNode}>{item.auditorium_name || 'Auditorium'}</Text>
                 </View>
               </View>
             );
@@ -123,6 +127,9 @@ const styles = StyleSheet.create({
   presentVal: {
     color: '#059669',
   },
+  absentVal: {
+    color: '#DC2626',
+  },
   statLbl: {
     fontSize: 10,
     fontWeight: '700',
@@ -140,6 +147,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  absentRecordCard: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FAFAFA',
   },
   recordHeader: {
     flexDirection: 'row',
@@ -160,7 +171,7 @@ const styles = StyleSheet.create({
   presentPill: {
     backgroundColor: '#DCFCE7',
   },
-  rejectedPill: {
+  absentPill: {
     backgroundColor: '#FEE2E2',
   },
   statusText: {
@@ -170,7 +181,7 @@ const styles = StyleSheet.create({
   presentText: {
     color: '#15803D',
   },
-  rejectedText: {
+  absentText: {
     color: '#B91C1C',
   },
   recordTopic: {

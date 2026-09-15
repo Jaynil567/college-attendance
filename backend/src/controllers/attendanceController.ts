@@ -169,6 +169,7 @@ export class AttendanceController {
 
   /**
    * Get Student Attendance History (Student Portal)
+   * Shows all completed lectures for student's division with Present / Absent status
    */
   static async getStudentHistory(req: Request, res: Response): Promise<void> {
     try {
@@ -178,23 +179,79 @@ export class AttendanceController {
         return;
       }
 
+      // 1. Fetch student division & details
+      const studentRes = await query('SELECT division, enrollment_number, full_name FROM students WHERE id = $1', [studentId]);
+      if (!studentRes.rows || studentRes.rows.length === 0) {
+        res.status(404).json({ success: false, error: 'STUDENT_NOT_FOUND' });
+        return;
+      }
+      const studentDivision = (studentRes.rows[0].division || '').trim().toUpperCase();
+
+      // 2. Fetch all completed/recorded sessions
+      const sessionsRes = await query(
+        `SELECT s.id, s.session_name, s.auditorium_id, s.auditorium_name, s.target_divisions, 
+                s.start_time, s.end_time, s.created_by,
+                c.class_name, c.subject, c.semester
+         FROM attendance_sessions s
+         LEFT JOIN classes c ON s.class_id = c.id
+         ORDER BY s.start_time DESC`
+      );
+
+      // 3. Fetch all attendance records marked by this student
       const recordsRes = await query(
-        `SELECT ar.id, ar.marked_at, ar.status, ar.rssi_dbm, ar.rejection_reason,
-                s.session_name, s.auditorium_id, s.auditorium_name, s.start_time, s.end_time,
-                c.class_name, c.subject, c.semester, c.division,
-                d.esp32_id, d.device_name, d.classroom_id
-         FROM attendance_records ar
-         JOIN attendance_sessions s ON ar.session_id = s.id
-         LEFT JOIN classes c ON ar.class_id = c.id
-         LEFT JOIN esp32_devices d ON ar.esp32_id = d.id
-         WHERE ar.student_id = $1
-         ORDER BY ar.marked_at DESC`,
+        `SELECT id, session_id, marked_at, status, rejection_reason
+         FROM attendance_records
+         WHERE student_id = $1`,
         [studentId]
       );
 
-      // Compute statistics
-      const totalCount = recordsRes.rows.length;
-      const presentCount = recordsRes.rows.filter((r: any) => r.status === 'present').length;
+      const recordMap = new Map<string, any>();
+      for (const rec of recordsRes.rows) {
+        recordMap.set(rec.session_id, rec);
+      }
+
+      const allRecords: any[] = [];
+      let presentCount = 0;
+
+      for (const sess of sessionsRes.rows) {
+        // Parse target_divisions
+        let targetDivs: string[] = [];
+        if (sess.target_divisions) {
+          try {
+            targetDivs = typeof sess.target_divisions === 'string'
+              ? JSON.parse(sess.target_divisions)
+              : sess.target_divisions;
+          } catch (e) {
+            targetDivs = String(sess.target_divisions).split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+          }
+        }
+
+        // Check if session applies to student's division (if empty/all, applies to all)
+        const isTarget = targetDivs.length === 0 || targetDivs.some((d) => d.toUpperCase() === studentDivision);
+
+        if (isTarget) {
+          const rec = recordMap.get(sess.id);
+          const isPresent = rec && rec.status === 'present';
+          if (isPresent) presentCount++;
+
+          allRecords.push({
+            id: rec ? rec.id : `absent_${sess.id}`,
+            sessionId: sess.id,
+            session_name: sess.session_name || 'Lecture Session',
+            subject: sess.subject || 'Classroom Lecture',
+            className: sess.class_name || 'General',
+            auditorium_name: sess.auditorium_name || 'Auditorium',
+            marked_at: rec ? rec.marked_at : (sess.end_time || sess.start_time),
+            start_time: sess.start_time,
+            end_time: sess.end_time,
+            status: isPresent ? 'present' : 'absent',
+            division: studentDivision,
+          });
+        }
+      }
+
+      const totalCount = allRecords.length;
+      const absentCount = totalCount - presentCount;
       const percentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
 
       res.status(200).json({
@@ -202,10 +259,10 @@ export class AttendanceController {
         stats: {
           totalSessions: totalCount,
           presentCount,
-          absentCount: totalCount - presentCount,
+          absentCount,
           percentage,
         },
-        records: recordsRes.rows || [],
+        records: allRecords,
       });
     } catch (err: any) {
       console.error('[AttendanceController.getStudentHistory]', err);
