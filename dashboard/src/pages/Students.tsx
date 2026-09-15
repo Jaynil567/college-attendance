@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService, api } from '../services/api.js';
-import { Users, UserPlus, Search, Filter, Trash2, Edit2, CheckCircle2, XCircle, Eye, EyeOff, Key, Download, RefreshCw, Smartphone } from 'lucide-react';
+import { Users, UserPlus, Search, Filter, Trash2, Edit2, CheckCircle2, XCircle, Eye, EyeOff, Key, Download, RefreshCw, Smartphone, FileText } from 'lucide-react';
 import { Modal } from '../components/Modal.js';
 import { Student, ClassItem } from '../types/index.js';
 
@@ -20,6 +20,7 @@ export const Students: React.FC<{
   const [currentEditStudent, setCurrentEditStudent] = useState<Student | null>(null);
   const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
   const [resettingPasswords, setResettingPasswords] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Form fields
   const [enrollmentNumber, setEnrollmentNumber] = useState('');
@@ -188,6 +189,21 @@ export const Students: React.FC<{
     }
   };
 
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      await ApiService.exportCredentialsPdf({
+        search: searchQuery || undefined,
+        division: selectedDivisionFilter || undefined,
+        groupName: selectedGroupFilter || undefined,
+      });
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to download PDF credentials');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const handleResetAllPasswords = async () => {
     if (!window.confirm('⚠️ This will generate new random 4-digit passwords for ALL students. Students who are already logged in will NOT be affected (their sessions stay active). Continue?')) return;
     setResettingPasswords(true);
@@ -242,6 +258,15 @@ export const Students: React.FC<{
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+            className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all disabled:opacity-50"
+          >
+            <FileText className="w-4 h-4" />
+            <span>{downloadingPdf ? 'Generating PDF...' : 'Download PDF'}</span>
+          </button>
+
           <button
             onClick={handleDownloadCredentials}
             className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"

@@ -93,4 +93,28 @@ export const ApiService = {
     link.click();
     link.remove();
   },
+
+  exportCredentialsPdf: async (params?: { division?: string; groupName?: string; search?: string }) => {
+    const response = await api.get('/students/export-pdf', {
+      params,
+      responseType: 'blob',
+    });
+    const downloadUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+
+    let filename = `Student_Credentials_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const contentDisposition = response.headers?.['content-disposition'] || response.headers?.['Content-Disposition'];
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^";]+)"?/);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
 };

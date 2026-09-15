@@ -10,6 +10,7 @@ router.use(authenticateToken);
 router.get('/', requireTeacherOrAdmin, StudentController.getStudents);
 router.post('/reset-all-passwords', requireTeacherOrAdmin, StudentController.resetAllPasswords);
 router.get('/export-credentials', requireTeacherOrAdmin, StudentController.exportCredentials);
+router.get('/export-pdf', requireTeacherOrAdmin, StudentController.exportCredentialsPdf);
 router.get('/:id', requireTeacherOrAdmin, StudentController.getStudentById);
 router.post('/', requireTeacherOrAdmin, StudentController.createStudent); // Students cannot self-register!
 router.put('/:id', requireTeacherOrAdmin, StudentController.updateStudent);

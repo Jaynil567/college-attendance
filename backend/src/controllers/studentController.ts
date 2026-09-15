@@ -377,4 +377,58 @@ export class StudentController {
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
     }
   }
+
+  /**
+   * Export student credentials as print-ready PDF
+   */
+  static async exportCredentialsPdf(req: Request, res: Response): Promise<void> {
+    try {
+      const { division, groupName, group, search } = req.query;
+
+      let sql = `SELECT enrollment_number, full_name, division, roll_number, group_name, plain_password FROM students WHERE 1=1`;
+      const params: any[] = [];
+
+      if (search && typeof search === 'string' && search.trim() !== '') {
+        params.push(`%${search.trim().toUpperCase()}%`);
+        sql += ` AND (UPPER(enrollment_number) LIKE $${params.length} OR UPPER(full_name) LIKE $${params.length})`;
+      }
+
+      if (division && typeof division === 'string' && division.trim() !== '') {
+        params.push(division.trim());
+        sql += ` AND division = $${params.length}`;
+      }
+
+      const targetGroup = groupName || group;
+      if (targetGroup && typeof targetGroup === 'string' && targetGroup.trim() !== '') {
+        params.push(targetGroup.trim());
+        sql += ` AND group_name = $${params.length}`;
+      }
+
+      sql += ` ORDER BY COALESCE(group_name, '') ASC, COALESCE(division, '') ASC, NULLIF(regexp_replace(COALESCE(roll_number, '0'), '\\D', '', 'g'), '')::INTEGER ASC NULLS LAST, roll_number ASC`;
+
+      const result = await query(sql, params);
+
+      const rows = (result.rows || []).map((st: any, idx: number) => ({
+        srNo: idx + 1,
+        group: st.group_name || 'N/A',
+        division: st.division || 'N/A',
+        rollNumber: st.roll_number || 'N/A',
+        enrollment: st.enrollment_number,
+        name: st.full_name,
+        password: st.plain_password || 'N/A',
+      }));
+
+      const { PdfService } = await import('../services/pdfService.js');
+      const pdfBuffer = await PdfService.generateCredentialsPdf(rows);
+
+      const filename = `Student_Credentials_${new Date().toISOString().slice(0, 10)}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+      res.send(pdfBuffer);
+    } catch (err: any) {
+      console.error('[StudentController.exportCredentialsPdf]', err);
+      res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
+    }
+  }
 }
