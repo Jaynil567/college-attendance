@@ -287,17 +287,34 @@ export class AttendanceController {
       const { classId, sessionId, startDate, endDate, division, groupName } = req.query;
 
       let result;
-      let sessionName = 'Attendance Session';
+      let sessionName = 'Attendance_Session';
       let auditoriumName = 'Auditorium';
+      let sessionStartTime = new Date();
 
       if (sessionId && typeof sessionId === 'string') {
-        const sessRes = await query(`SELECT session_name, auditorium_name FROM attendance_sessions WHERE id = $1`, [sessionId]);
+        const sessRes = await query(
+          `SELECT session_name, auditorium_name, target_divisions, start_time FROM attendance_sessions WHERE id = $1`,
+          [sessionId]
+        );
+        let targetDivs: string[] = [];
+
         if (sessRes.rows && sessRes.rows.length > 0) {
-          sessionName = sessRes.rows[0].session_name;
+          sessionName = sessRes.rows[0].session_name || 'Attendance_Session';
           auditoriumName = sessRes.rows[0].auditorium_name || 'Auditorium';
+          sessionStartTime = sessRes.rows[0].start_time || new Date();
+
+          if (sessRes.rows[0].target_divisions) {
+            try {
+              targetDivs = typeof sessRes.rows[0].target_divisions === 'string'
+                ? JSON.parse(sessRes.rows[0].target_divisions)
+                : sessRes.rows[0].target_divisions;
+            } catch (e) {
+              targetDivs = String(sessRes.rows[0].target_divisions).split(',').map((s) => s.trim()).filter(Boolean);
+            }
+          }
         }
 
-        // Query ALL students for this session, showing PRESENT or ABSENT
+        // Query ALL students for this session's selected divisions (showing PRESENT or ABSENT)
         let sql = `
           SELECT st.enrollment_number, st.full_name as student_name,
                  COALESCE(st.division, 'N/A') as division,
@@ -310,6 +327,11 @@ export class AttendanceController {
           WHERE st.status = 'active'
         `;
         const params: any[] = [sessionId];
+
+        if (targetDivs.length > 0) {
+          params.push(targetDivs);
+          sql += ` AND st.division = ANY($${params.length})`;
+        }
 
         if (division && typeof division === 'string' && division.trim() !== '') {
           params.push(division.trim());
@@ -371,10 +393,14 @@ export class AttendanceController {
         records: exportRows,
       });
 
-      const filename = `Attendance_Sheet_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      // Excel Filename == Session Name + Date
+      const dateStr = new Date(sessionStartTime).toISOString().slice(0, 10);
+      const cleanSessionName = sessionName.trim().replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const filename = `${cleanSessionName}_${dateStr}.xlsx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
       res.send(buffer);
     } catch (err: any) {
       console.error('[AttendanceController.exportExcel]', err);

@@ -11,6 +11,9 @@ import {
   RefreshControl,
   Linking,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
 import { useMobileAuth } from '../context/AuthContext';
 import { MobileApiService, DEFAULT_API_URL } from '../services/api';
 import { BleService } from '../services/bleService';
@@ -206,11 +209,37 @@ export const TeacherSessionScreen: React.FC = () => {
 
   const handleDownloadSheet = async () => {
     if (!activeSession?.id) return;
+    const sessionTitle = activeSession.session_name || activeSession.sessionName || subjectTitle || 'Session';
+    const cleanName = sessionTitle.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `${cleanName}_${dateStr}.xlsx`;
     const url = `${DEFAULT_API_URL}/attendance/export?sessionId=${activeSession.id}`;
+
     try {
-      await Linking.openURL(url);
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      const downloadResult = await FileSystem.downloadAsync(url, fileUri);
+
+      if (downloadResult.status === 200) {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(downloadResult.uri, {
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            dialogTitle: `Save ${fileName}`,
+            UTI: 'com.microsoft.excel.xlsx',
+          });
+        } else {
+          await WebBrowser.openBrowserAsync(url);
+        }
+      } else {
+        await WebBrowser.openBrowserAsync(url);
+      }
     } catch (err: any) {
-      Alert.alert('Download Failed', err.message || 'Could not download attendance sheet.');
+      console.warn('[TeacherSession] FileSystem download failed, trying WebBrowser fallback', err);
+      try {
+        await WebBrowser.openBrowserAsync(url);
+      } catch (browserErr: any) {
+        Alert.alert('Download Failed', 'Could not open attendance download link in browser.');
+      }
     }
   };
 
