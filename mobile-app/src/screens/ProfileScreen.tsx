@@ -1,18 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useMobileAuth } from '../context/AuthContext';
-import { setApiBaseUrl, DEFAULT_API_URL } from '../services/api';
 
 export const ProfileScreen: React.FC = () => {
-  const { student, logout } = useMobileAuth();
-  const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
-  const [savedSuccess, setSavedSuccess] = useState(false);
-
-  const handleSaveApiUrl = () => {
-    setApiBaseUrl(apiUrl.trim());
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2000);
-  };
+  const { student } = useMobileAuth();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -27,19 +18,25 @@ export const ProfileScreen: React.FC = () => {
       </View>
 
       <View style={styles.infoCard}>
-        <Text style={styles.cardHeader}>ACADEMIC ENROLLMENT</Text>
+        <Text style={styles.cardHeader}>🎓 ACADEMIC ENROLLMENT</Text>
 
         <View style={styles.row}>
-          <Text style={styles.label}>Class / Branch</Text>
-          <Text style={styles.val}>{student?.className || 'Computer Engineering'}</Text>
+          <Text style={styles.label}>Enrollment No.</Text>
+          <Text style={styles.val}>{student?.enrollmentNumber || 'N/A'}</Text>
         </View>
         <View style={styles.row}>
-          <Text style={styles.label}>Subject</Text>
-          <Text style={styles.val}>{student?.subject || 'Computer Networks'}</Text>
+          <Text style={styles.label}>Group</Text>
+          <Text style={styles.val}>{student?.groupName || 'N/A'}</Text>
         </View>
         <View style={styles.row}>
-          <Text style={styles.label}>Semester & Division</Text>
-          <Text style={styles.val}>Sem {student?.semester || '5'} - Div {student?.division || 'A'}</Text>
+          <Text style={styles.label}>Division & Roll No.</Text>
+          <Text style={styles.val}>
+            Div {student?.division || 'N/A'} — Roll {student?.rollNumber || 'N/A'}
+          </Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Institute</Text>
+          <Text style={styles.val}>L.J. Institute of Engineering & Tech.</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Account Status</Text>
@@ -55,33 +52,15 @@ export const ProfileScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Network / Backend API Host Config */}
+      {/* Security Info */}
       <View style={styles.infoCard}>
-        <Text style={styles.cardHeader}>BACKEND SERVER URL (LAN / WI-FI)</Text>
-        <Text style={styles.helperText}>
-          When testing on a physical iPhone or Android phone, enter your PC's LAN IP (e.g. http://192.168.1.15:5000/api):
-        </Text>
-        <TextInput
-          style={styles.apiInput}
-          value={apiUrl}
-          onChangeText={setApiUrl}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveApiUrl}>
-          <Text style={styles.saveBtnText}>{savedSuccess ? 'Saved!' : 'Update Server URL'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Security Info (no logout for students) */}
-      <View style={styles.infoCard}>
-        <Text style={styles.cardHeader}>🔒 SECURITY</Text>
+        <Text style={styles.cardHeader}>🔒 SECURITY & VERIFICATION</Text>
         <View style={styles.row}>
           <Text style={styles.label}>Device Binding</Text>
           <Text style={[styles.val, styles.activeVal]}>LOCKED ✅</Text>
         </View>
         <View style={styles.row}>
-          <Text style={styles.label}>Biometric</Text>
+          <Text style={styles.label}>Biometric Auth</Text>
           <Text style={[styles.val, styles.activeVal]}>REQUIRED</Text>
         </View>
         <View style={[styles.row, styles.noBorder]}>

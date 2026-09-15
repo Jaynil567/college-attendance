@@ -174,6 +174,8 @@ export class AuthController {
           subject: student.subject,
           semester: student.semester,
           division: student.division,
+          groupName: student.group_name,
+          rollNumber: student.roll_number,
           status: student.status,
           deviceBound: !!student.device_id,
         },

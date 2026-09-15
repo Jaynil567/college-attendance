@@ -14,6 +14,8 @@ export interface StudentProfile {
   subject?: string;
   semester?: string;
   division?: string;
+  groupName?: string;
+  rollNumber?: string;
   status: 'active' | 'inactive';
 }
 
