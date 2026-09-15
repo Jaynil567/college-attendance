@@ -49,7 +49,7 @@ android {
 }
 
 dependencies {
-    implementation 'com.facebook.react:react-native:+'
+    implementation 'com.facebook.react:react-android'
 }
 `;
         fs.writeFileSync(gradlePath, newGradle, 'utf8');
