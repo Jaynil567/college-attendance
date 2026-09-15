@@ -3,27 +3,22 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Expo Config Plugin to fix react-native-ble-advertiser's build.gradle
- * for compatibility with modern Android SDK versions.
- * 
- * Fixes:
- * 1. compileSdkVersion 28 → uses project's compileSdkVersion
- * 2. Missing namespace (required for AGP 8+)
- * 3. Old buildToolsVersion
- * 4. Old react-native dependency format
+ * Expo Config Plugin to patch react-native-ble-advertiser
+ * for compatibility with AGP 8+, React Native 0.86, and Expo SDK 57.
  */
 function withBleAdvertiserFix(config) {
   return withDangerousMod(config, [
     'android',
     (config) => {
-      const gradlePath = path.join(
+      const nodeModulesDir = path.join(
         config.modRequest.projectRoot,
         'node_modules',
         'react-native-ble-advertiser',
-        'android',
-        'build.gradle'
+        'android'
       );
 
+      // 1. Patch build.gradle
+      const gradlePath = path.join(nodeModulesDir, 'build.gradle');
       if (fs.existsSync(gradlePath)) {
         const newGradle = `apply plugin: 'com.android.library'
 
@@ -54,8 +49,50 @@ dependencies {
 `;
         fs.writeFileSync(gradlePath, newGradle, 'utf8');
         console.log('[BleAdvertiserFix] Patched build.gradle successfully');
-      } else {
-        console.warn('[BleAdvertiserFix] build.gradle not found at:', gradlePath);
+      }
+
+      // 2. Patch BLEAdvertiserModule.java (remove removed RN imports like Systrace)
+      const moduleJavaPath = path.join(
+        nodeModulesDir,
+        'src',
+        'main',
+        'java',
+        'com',
+        'vitorpamplona',
+        'bleadvertiser',
+        'BLEAdvertiserModule.java'
+      );
+      if (fs.existsSync(moduleJavaPath)) {
+        let content = fs.readFileSync(moduleJavaPath, 'utf8');
+        content = content
+          .replace(/import com\.facebook\.systrace\..*;/g, '')
+          .replace(/import com\.facebook\.react\.ReactInstanceManager;/g, '')
+          .replace(/import com\.facebook\.react\.ReactRootView;/g, '')
+          .replace(/import com\.facebook\.react\.modules\.core\.DefaultHardwareBackBtnHandler;/g, '')
+          .replace(/import com\.facebook\.react\.shell\.MainReactPackage;/g, '')
+          .replace(/import com\.facebook\.soloader\.SoLoader;/g, '');
+
+        fs.writeFileSync(moduleJavaPath, content, 'utf8');
+        console.log('[BleAdvertiserFix] Patched BLEAdvertiserModule.java successfully');
+      }
+
+      // 3. Patch BLEAdvertiserPackage.java (remove JavaScriptModule import)
+      const packageJavaPath = path.join(
+        nodeModulesDir,
+        'src',
+        'main',
+        'java',
+        'com',
+        'vitorpamplona',
+        'bleadvertiser',
+        'BLEAdvertiserPackage.java'
+      );
+      if (fs.existsSync(packageJavaPath)) {
+        let content = fs.readFileSync(packageJavaPath, 'utf8');
+        content = content.replace(/import com\.facebook\.react\.bridge\.JavaScriptModule;/g, '');
+
+        fs.writeFileSync(packageJavaPath, content, 'utf8');
+        console.log('[BleAdvertiserFix] Patched BLEAdvertiserPackage.java successfully');
       }
 
       return config;
