@@ -59,7 +59,7 @@ export class BleService {
     }
 
     try {
-      const BLEAdvertiser = require('react-native-ble-advertiser').default;
+      const BLEAdvertiser = require('react-native-ble-advertiser');
       
       // Set company ID (using 0x004C for general purpose)
       BLEAdvertiser.setCompanyId(0x004C);
@@ -88,7 +88,7 @@ export class BleService {
    */
   public static async stopAdvertising(): Promise<void> {
     try {
-      const BLEAdvertiser = require('react-native-ble-advertiser').default;
+      const BLEAdvertiser = require('react-native-ble-advertiser');
       await BLEAdvertiser.stopBroadcast();
       this._isAdvertising = false;
       console.log('[BLE] Teacher advertising stopped');
