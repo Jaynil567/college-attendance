@@ -42,7 +42,7 @@ export const TeacherSessionScreen: React.FC = () => {
   const { teacher, token, logout } = useMobileAuth();
   const [selectedAudiId, setSelectedAudiId] = useState<'AUDITORIUM_01' | 'AUDITORIUM_02' | 'AUDITORIUM_03'>('AUDITORIUM_01');
   const [subjectTitle, setSubjectTitle] = useState('');
-  const [selectedDivisions, setSelectedDivisions] = useState<string[]>(['A1']);
+  const [selectedDivisions, setSelectedDivisions] = useState<string[]>([]);
   const [activeSession, setActiveSession] = useState<any | null>(null);
   const [sessionRecords, setSessionRecords] = useState<any[]>([]);
   const [auditoriumsStatus, setAuditoriumsStatus] = useState<any[]>([]);
