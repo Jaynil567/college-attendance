@@ -4,6 +4,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useMobileAuth } from '../context/AuthContext';
 import { MobileApiService } from '../services/api';
 import { BleService, BleScanResult } from '../services/bleService';
+import { SimService, SimStatus } from '../services/simService';
 
 interface AuditoriumStatus {
   id: string;
@@ -41,10 +42,11 @@ export const MarkAttendanceScreen: React.FC = () => {
   ]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [simState, setSimState] = useState<SimStatus | null>(null);
 
   // Verification flow state
   const [activeAudiTarget, setActiveAudiTarget] = useState<AuditoriumStatus | null>(null);
-  const [flowState, setFlowState] = useState<'idle' | 'biometric' | 'scanning' | 'submitting' | 'success' | 'rejected'>('idle');
+  const [flowState, setFlowState] = useState<'idle' | 'simCheck' | 'biometric' | 'scanning' | 'submitting' | 'success' | 'rejected'>('idle');
   const [verificationFeedback, setVerificationFeedback] = useState<string>('');
   const [rejectionCode, setRejectionCode] = useState<string>('');
   const [verificationStats, setVerificationStats] = useState<any>(null);
@@ -65,6 +67,7 @@ export const MarkAttendanceScreen: React.FC = () => {
 
   useEffect(() => {
     fetchAuditoriums();
+    SimService.checkSimStatus().then(setSimState);
     const interval = setInterval(fetchAuditoriums, 4000);
     return () => clearInterval(interval);
   }, []);
@@ -72,20 +75,36 @@ export const MarkAttendanceScreen: React.FC = () => {
   const onRefresh = () => {
     setRefreshing(true);
     fetchAuditoriums();
+    SimService.checkSimStatus().then(setSimState);
   };
 
   /**
    * ANTI-CHEAT ATTENDANCE FLOW:
-   * Step 1: Biometric (Fingerprint / Face ID)
-   * Step 2: BLE Scan (detect teacher's phone beacon)
-   * Step 3: Submit with device fingerprint to backend
+   * Step 1: SIM Card Hardware Verification (expo-cellular)
+   * Step 2: Biometric (Fingerprint / Face ID)
+   * Step 3: BLE Scan (detect teacher's phone beacon)
+   * Step 4: Submit with device fingerprint & SIM state to backend
    */
   const handleMarkAttendance = async (audi: AuditoriumStatus) => {
     if (!audi.activeSession || !student) return;
 
     setActiveAudiTarget(audi);
 
-    // ─── STEP 1: BIOMETRIC VERIFICATION ─────────────────────
+    // ─── STEP 1: SIM CARD VERIFICATION ───────────────────────
+    setFlowState('simCheck');
+    setVerificationFeedback('Verifying active SIM card presence...');
+
+    const currentSim = await SimService.checkSimStatus();
+    setSimState(currentSim);
+
+    if (!currentSim.hasSimCard) {
+      setFlowState('rejected');
+      setRejectionCode('SIM_CARD_REQUIRED');
+      setVerificationFeedback(currentSim.reason || '❌ Active SIM card is required in your phone.');
+      return;
+    }
+
+    // ─── STEP 2: BIOMETRIC VERIFICATION ─────────────────────
     setFlowState('biometric');
     setVerificationFeedback('Verifying your identity...');
 
@@ -121,7 +140,7 @@ export const MarkAttendanceScreen: React.FC = () => {
         return;
       }
 
-      // ─── STEP 2: BLE SCAN FOR TEACHER'S PHONE ─────────────
+      // ─── STEP 3: BLE SCAN FOR TEACHER'S PHONE ─────────────
       setFlowState('scanning');
       setVerificationFeedback(`Scanning for ${audi.name} teacher beacon...`);
 
@@ -141,7 +160,7 @@ export const MarkAttendanceScreen: React.FC = () => {
         return;
       }
 
-      // ─── STEP 3: SUBMIT TO BACKEND ─────────────────────────
+      // ─── STEP 4: SUBMIT TO BACKEND ─────────────────────────
       setFlowState('submitting');
       setVerificationFeedback('Recording attendance...');
 
@@ -151,6 +170,9 @@ export const MarkAttendanceScreen: React.FC = () => {
         biometricVerified: true,
         bleRssi: scanResult.rssi,
         bleDeviceName: scanResult.deviceName,
+        hasSimCard: currentSim.hasSimCard,
+        simCarrier: currentSim.carrierName || undefined,
+        simCountry: currentSim.countryCode || undefined,
       });
 
       if (response.data.success) {
@@ -162,6 +184,7 @@ export const MarkAttendanceScreen: React.FC = () => {
           markedAt: new Date().toLocaleTimeString(),
           rssi: scanResult.rssi,
           bleDevice: scanResult.deviceName,
+          carrier: currentSim.carrierName,
         });
 
         setAuditoriums((prev) =>
@@ -204,19 +227,22 @@ export const MarkAttendanceScreen: React.FC = () => {
 
       {/* Security Badge */}
       <View style={styles.securityBadge}>
-        <Text style={styles.securityIcon}>🛡️</Text>
+        <Text style={styles.securityIcon}>📱</Text>
         <View style={styles.securityInfo}>
-          <Text style={styles.securityTitle}>Anti-Cheat Protection Active</Text>
-          <Text style={styles.securityDesc}>Fingerprint + BLE + Device Lock</Text>
+          <Text style={styles.securityTitle}>SIM & Device Security Active</Text>
+          <Text style={styles.securityDesc}>
+            {simState?.carrierName ? `SIM: ${simState.carrierName} (${simState.networkGeneration || 'Cellular'})` : 'Active SIM Card Required'} • Fingerprint • Device Lock
+          </Text>
         </View>
-        <View style={styles.securityDot} />
+        <View style={[styles.securityDot, { backgroundColor: simState?.hasSimCard !== false ? '#22C55E' : '#EF4444' }]} />
       </View>
 
       {/* Verification In-Progress Card */}
-      {(flowState === 'biometric' || flowState === 'scanning' || flowState === 'submitting') && (
+      {(flowState === 'simCheck' || flowState === 'biometric' || flowState === 'scanning' || flowState === 'submitting') && (
         <View style={styles.statusCard}>
           <ActivityIndicator size="large" color="#2563EB" />
           <Text style={styles.statusTitle}>
+            {flowState === 'simCheck' && '📱 SIM Card Verification...'}
             {flowState === 'biometric' && '🔐 Fingerprint Verification...'}
             {flowState === 'scanning' && `📡 Scanning ${activeAudiTarget?.name}...`}
             {flowState === 'submitting' && '✓ Recording Attendance...'}
@@ -225,13 +251,16 @@ export const MarkAttendanceScreen: React.FC = () => {
 
           {/* Progress steps */}
           <View style={styles.stepsContainer}>
-            <View style={[styles.stepDot, flowState === 'biometric' ? styles.stepActive : styles.stepDone]} />
-            <View style={[styles.stepLine, flowState !== 'biometric' ? styles.stepLineDone : {}]} />
+            <View style={[styles.stepDot, flowState === 'simCheck' ? styles.stepActive : styles.stepDone]} />
+            <View style={[styles.stepLine, flowState !== 'simCheck' ? styles.stepLineDone : {}]} />
+            <View style={[styles.stepDot, flowState === 'biometric' ? styles.stepActive : (flowState === 'scanning' || flowState === 'submitting') ? styles.stepDone : styles.stepPending]} />
+            <View style={[styles.stepLine, (flowState === 'scanning' || flowState === 'submitting') ? styles.stepLineDone : {}]} />
             <View style={[styles.stepDot, flowState === 'scanning' ? styles.stepActive : flowState === 'submitting' ? styles.stepDone : styles.stepPending]} />
             <View style={[styles.stepLine, flowState === 'submitting' ? styles.stepLineDone : {}]} />
             <View style={[styles.stepDot, flowState === 'submitting' ? styles.stepActive : styles.stepPending]} />
           </View>
           <View style={styles.stepsLabels}>
+            <Text style={styles.stepLabel}>SIM Card</Text>
             <Text style={styles.stepLabel}>Fingerprint</Text>
             <Text style={styles.stepLabel}>BLE Scan</Text>
             <Text style={styles.stepLabel}>Submit</Text>

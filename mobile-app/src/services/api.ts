@@ -42,6 +42,9 @@ export const MobileApiService = {
     biometricVerified: boolean;
     bleRssi?: number;
     bleDeviceName?: string;
+    hasSimCard?: boolean;
+    simCarrier?: string;
+    simCountry?: string;
   }) => mobileApi.post('/attendance/mark', data),
 
   getHistory: () => mobileApi.get('/attendance/history'),

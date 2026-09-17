@@ -10,6 +10,9 @@ const markAttendanceSchema = z.object({
   biometricVerified: z.boolean(),
   bleRssi: z.number().int().optional().default(-65),
   bleDeviceName: z.string().optional().default('Teacher Phone'),
+  hasSimCard: z.boolean().optional(),
+  simCarrier: z.string().optional(),
+  simCountry: z.string().optional(),
 });
 
 export class AttendanceController {
@@ -39,7 +42,7 @@ export class AttendanceController {
         return;
       }
 
-      const { sessionId, deviceFingerprint, biometricVerified, bleRssi, bleDeviceName } = parsed.data;
+      const { sessionId, deviceFingerprint, biometricVerified, bleRssi, bleDeviceName, hasSimCard, simCarrier } = parsed.data;
 
       // 1. Fetch Student Details
       const studentRes = await query('SELECT * FROM students WHERE id = $1', [studentId]);
@@ -54,6 +57,15 @@ export class AttendanceController {
           success: false,
           error: 'STUDENT_INACTIVE',
           message: 'Student account is inactive. Attendance cannot be recorded.',
+        });
+        return;
+      }
+
+      if (hasSimCard === false) {
+        res.status(403).json({
+          success: false,
+          error: 'SIM_CARD_REQUIRED',
+          message: '❌ Active SIM card matching your registered mobile number is required in your phone.',
         });
         return;
       }
