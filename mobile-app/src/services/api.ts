@@ -45,6 +45,7 @@ export const MobileApiService = {
     hasSimCard?: boolean;
     simCarrier?: string;
     simCountry?: string;
+    simPhoneNumber?: string;
   }) => mobileApi.post('/attendance/mark', data),
 
   getHistory: () => mobileApi.get('/attendance/history'),

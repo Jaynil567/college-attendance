@@ -173,6 +173,7 @@ export const MarkAttendanceScreen: React.FC = () => {
         hasSimCard: currentSim.hasSimCard,
         simCarrier: currentSim.carrierName || undefined,
         simCountry: currentSim.countryCode || undefined,
+        simPhoneNumber: student?.phoneNumber || undefined,
       });
 
       if (response.data.success) {

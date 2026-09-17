@@ -4,6 +4,12 @@ import { z } from 'zod';
 import { query } from '../config/db.js';
 import { ExcelService, AttendanceExportRow } from '../services/excelService.js';
 
+function normalizePhoneNumber(phone?: string | null): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
 const markAttendanceSchema = z.object({
   sessionId: z.string().uuid('Valid Session ID is required'),
   deviceFingerprint: z.string().min(5, 'Device fingerprint is required'),
@@ -13,6 +19,7 @@ const markAttendanceSchema = z.object({
   hasSimCard: z.boolean().optional(),
   simCarrier: z.string().optional(),
   simCountry: z.string().optional(),
+  simPhoneNumber: z.string().optional(),
 });
 
 export class AttendanceController {
@@ -42,7 +49,7 @@ export class AttendanceController {
         return;
       }
 
-      const { sessionId, deviceFingerprint, biometricVerified, bleRssi, bleDeviceName, hasSimCard, simCarrier } = parsed.data;
+      const { sessionId, deviceFingerprint, biometricVerified, bleRssi, bleDeviceName, hasSimCard, simCarrier, simPhoneNumber } = parsed.data;
 
       // 1. Fetch Student Details
       const studentRes = await query('SELECT * FROM students WHERE id = $1', [studentId]);
@@ -68,6 +75,19 @@ export class AttendanceController {
           message: '❌ Active SIM card matching your registered mobile number is required in your phone.',
         });
         return;
+      }
+
+      if (student.phone_number && simPhoneNumber) {
+        const studentNormPhone = normalizePhoneNumber(student.phone_number);
+        const simNormPhone = normalizePhoneNumber(simPhoneNumber);
+        if (studentNormPhone && simNormPhone && studentNormPhone !== simNormPhone) {
+          res.status(403).json({
+            success: false,
+            error: 'SIM_NUMBER_MISMATCH',
+            message: `❌ SIM card mismatch! Active device SIM does not match your registered number (${student.phone_number}).`,
+          });
+          return;
+        }
       }
 
       if (!biometricVerified) {
