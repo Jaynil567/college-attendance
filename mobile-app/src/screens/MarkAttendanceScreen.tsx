@@ -17,6 +17,7 @@ interface AuditoriumStatus {
     teacherName: string;
     startTime: string;
     presentCount: number;
+    requireSimVerification?: boolean;
   } | null;
   hasMarkedAttendance: boolean;
   device?: {
@@ -90,18 +91,29 @@ export const MarkAttendanceScreen: React.FC = () => {
 
     setActiveAudiTarget(audi);
 
-    // ─── STEP 1: SIM CARD VERIFICATION ───────────────────────
-    setFlowState('simCheck');
-    setVerificationFeedback('Verifying active SIM card presence...');
+    const requireSim = audi.activeSession.requireSimVerification !== false;
+    let currentSim: SimStatus = {
+      hasSimCard: true,
+      carrierName: 'Disabled by Teacher',
+      countryCode: 'in',
+      mobileCountryCode: null,
+      networkGeneration: 'N/A',
+    };
 
-    const currentSim = await SimService.checkSimStatus();
-    setSimState(currentSim);
+    if (requireSim) {
+      // ─── STEP 1: SIM CARD VERIFICATION ───────────────────────
+      setFlowState('simCheck');
+      setVerificationFeedback('Verifying active SIM card presence...');
 
-    if (!currentSim.hasSimCard) {
-      setFlowState('rejected');
-      setRejectionCode('SIM_CARD_REQUIRED');
-      setVerificationFeedback(currentSim.reason || '❌ Active SIM card is required in your phone.');
-      return;
+      currentSim = await SimService.checkSimStatus();
+      setSimState(currentSim);
+
+      if (!currentSim.hasSimCard) {
+        setFlowState('rejected');
+        setRejectionCode('SIM_CARD_REQUIRED');
+        setVerificationFeedback(currentSim.reason || '❌ Active SIM card is required in your phone.');
+        return;
+      }
     }
 
     // ─── STEP 2: BIOMETRIC VERIFICATION ─────────────────────

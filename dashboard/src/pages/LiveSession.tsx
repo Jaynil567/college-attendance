@@ -44,6 +44,7 @@ export const LiveSession: React.FC<{
   const [formAuditoriumId, setFormAuditoriumId] = useState<'AUDITORIUM_01' | 'AUDITORIUM_02' | 'AUDITORIUM_03'>('AUDITORIUM_01');
   const [subjectTitle, setSubjectTitle] = useState('');
   const [selectedDivisions, setSelectedDivisions] = useState<string[]>(['A1']);
+  const [requireSimVerification, setRequireSimVerification] = useState<boolean>(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -96,6 +97,7 @@ export const LiveSession: React.FC<{
       setFormAuditoriumId(preselectedAudiId as any);
     }
     setSubjectTitle('');
+    setRequireSimVerification(true);
     setFormError(null);
     setIsStartModalOpen(true);
   };
@@ -119,6 +121,7 @@ export const LiveSession: React.FC<{
         auditoriumId: formAuditoriumId,
         subject: subjectTitle.trim(),
         targetDivisions: selectedDivisions,
+        requireSimVerification,
       });
 
       if (res.data.success) {
@@ -496,6 +499,24 @@ export const LiveSession: React.FC<{
                 );
               })}
             </div>
+          </div>
+
+          {/* SIM Card Verification Toggle */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+            <div className="pr-3">
+              <div className="text-xs font-bold text-slate-800 flex items-center space-x-1">
+                <span>📱 Require Registered SIM Card Verification</span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Students must have their registered SIM card inside their phone. Uncheck if students have carrier issues in class.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={requireSimVerification}
+              onChange={(e) => setRequireSimVerification(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+            />
           </div>
 
           <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800">

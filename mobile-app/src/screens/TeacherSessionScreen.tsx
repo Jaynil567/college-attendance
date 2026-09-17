@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Linking,
   Modal,
+  Switch,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -51,6 +52,7 @@ export const TeacherSessionScreen: React.FC = () => {
   const [ending, setEnding] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [bleActive, setBleActive] = useState(false);
+  const [requireSimVerification, setRequireSimVerification] = useState(true);
 
   // Manual Check-In State
   const [manualDivision, setManualDivision] = useState('');
@@ -221,6 +223,7 @@ export const TeacherSessionScreen: React.FC = () => {
         auditoriumId: selectedAudiId,
         sessionName: subjectTitle.trim(),
         targetDivisions: selectedDivisions,
+        requireSimVerification,
       });
 
       if (res.data.success && res.data.session) {
@@ -583,6 +586,22 @@ export const TeacherSessionScreen: React.FC = () => {
                   </TouchableOpacity>
                 );
               })}
+            </View>
+
+            {/* SIM Card Verification Toggle */}
+            <View style={styles.simToggleBox}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={styles.simToggleTitle}>📱 Require SIM Card Verification</Text>
+                <Text style={styles.simToggleSubtitle}>
+                  Students must have registered SIM inserted. Turn OFF if students face cellular carrier issues.
+                </Text>
+              </View>
+              <Switch
+                value={requireSimVerification}
+                onValueChange={setRequireSimVerification}
+                trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                thumbColor={requireSimVerification ? '#2563EB' : '#64748B'}
+              />
             </View>
 
             {/* Notice info */}
@@ -1212,5 +1231,26 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 13,
+  },
+  simToggleBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 12,
+    marginVertical: 10,
+  },
+  simToggleTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  simToggleSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
   },
 });

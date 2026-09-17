@@ -58,7 +58,7 @@ export const ApiService = {
   getActiveSessions: () => api.get('/sessions/active'),
   getAllSessions: () => api.get('/sessions/all'),
   getSessionById: (id: string) => api.get(`/sessions/${id}`),
-  startSession: (data: { auditoriumId?: string; subject?: string; targetDivisions?: string[]; classId?: string; esp32Id?: string; sessionName?: string; durationMinutes?: number }) =>
+  startSession: (data: { auditoriumId?: string; subject?: string; targetDivisions?: string[]; classId?: string; esp32Id?: string; sessionName?: string; durationMinutes?: number; requireSimVerification?: boolean }) =>
     api.post('/sessions/start', data),
   closeSession: (id: string) => api.post(`/sessions/${id}/close`),
   endSession: (id: string) => api.post(`/sessions/${id}/end`),

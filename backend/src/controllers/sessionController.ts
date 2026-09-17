@@ -18,6 +18,7 @@ const startSessionSchema = z.object({
   esp32Id: z.string().optional().nullable(),
   sessionName: z.string().optional().nullable(),
   durationMinutes: z.number().min(1).max(480).optional().nullable(),
+  requireSimVerification: z.boolean().optional().default(true),
 });
 
 export class SessionController {
@@ -36,7 +37,7 @@ export class SessionController {
         return;
       }
 
-      const { auditoriumId, subject, targetDivisions, classId, esp32Id, sessionName, durationMinutes } = parsed.data;
+      const { auditoriumId, subject, targetDivisions, classId, esp32Id, sessionName, durationMinutes, requireSimVerification } = parsed.data;
       const createdBy = req.user?.id || null;
       const sessionId = crypto.randomUUID();
       const startTime = new Date();
@@ -88,10 +89,10 @@ export class SessionController {
       const result = await query(
         `INSERT INTO attendance_sessions (
           id, class_id, esp32_id, auditorium_id, auditorium_name, session_name, target_divisions,
-          start_time, end_time, status, created_by, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, NOW())
+          start_time, end_time, status, created_by, require_sim_verification, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, NOW())
         RETURNING *`,
-        [sessionId, classId || null, targetEsp32DeviceId, targetAuditoriumId, targetAuditoriumName, lectureTitle, targetDivisionsStr, startTime, endTime, createdBy]
+        [sessionId, classId || null, targetEsp32DeviceId, targetAuditoriumId, targetAuditoriumName, lectureTitle, targetDivisionsStr, startTime, endTime, createdBy, requireSimVerification]
       );
 
       // Fetch joined details
@@ -167,7 +168,7 @@ export class SessionController {
 
       // 2. Fetch active sessions in auditoriums
       const activeSessionsRes = await query(
-        `SELECT s.id, s.session_name, s.auditorium_id, s.auditorium_name, s.target_divisions, s.start_time, s.end_time, s.created_by,
+        `SELECT s.id, s.session_name, s.auditorium_id, s.auditorium_name, s.target_divisions, s.start_time, s.end_time, s.created_by, s.require_sim_verification,
                 t.full_name as teacher_name,
                 COUNT(ar.id)::int as present_count
          FROM attendance_sessions s
@@ -231,6 +232,7 @@ export class SessionController {
                 startTime: activeSession.start_time,
                 targetDivisions: activeSession.target_divisions,
                 presentCount: activeSession.present_count || 0,
+                requireSimVerification: activeSession.require_sim_verification !== false,
               }
             : null,
           hasMarkedAttendance: activeSession ? markedSessionIds.has(activeSession.id) : false,

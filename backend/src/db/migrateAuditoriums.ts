@@ -30,6 +30,7 @@ async function migrate() {
   await pool.query('ALTER TABLE attendance_sessions ALTER COLUMN end_time DROP NOT NULL');
   await pool.query('ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS auditorium_id VARCHAR(50)');
   await pool.query('ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS auditorium_name VARCHAR(100)');
+  await pool.query('ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS require_sim_verification BOOLEAN DEFAULT TRUE');
   console.log('✅ Updated attendance_sessions columns');
 
   // 3. Attendance Records updates

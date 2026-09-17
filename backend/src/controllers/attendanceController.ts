@@ -68,25 +68,48 @@ export class AttendanceController {
         return;
       }
 
-      if (hasSimCard === false) {
-        res.status(403).json({
-          success: false,
-          error: 'SIM_CARD_REQUIRED',
-          message: '❌ Active SIM card matching your registered mobile number is required in your phone.',
-        });
+      // 2. Fetch Session Details
+      const sessionRes = await query(
+        `SELECT s.*, c.class_name, c.subject
+         FROM attendance_sessions s
+         LEFT JOIN classes c ON s.class_id = c.id
+         WHERE s.id = $1`,
+        [sessionId]
+      );
+      if (!sessionRes.rows || sessionRes.rows.length === 0) {
+        res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND', message: 'Attendance session not found.' });
+        return;
+      }
+      const session = sessionRes.rows[0];
+
+      if (session.status !== 'active') {
+        res.status(400).json({ success: false, error: 'SESSION_CLOSED', message: 'Attendance session is no longer active.' });
         return;
       }
 
-      if (student.phone_number && simPhoneNumber) {
-        const studentNormPhone = normalizePhoneNumber(student.phone_number);
-        const simNormPhone = normalizePhoneNumber(simPhoneNumber);
-        if (studentNormPhone && simNormPhone && studentNormPhone !== simNormPhone) {
+      // SIM verification (optional per session settings set by teacher)
+      const requireSim = session.require_sim_verification !== false;
+      if (requireSim) {
+        if (hasSimCard === false) {
           res.status(403).json({
             success: false,
-            error: 'SIM_NUMBER_MISMATCH',
-            message: `❌ SIM card mismatch! Active device SIM does not match your registered number (${student.phone_number}).`,
+            error: 'SIM_CARD_REQUIRED',
+            message: '❌ Active SIM card matching your registered mobile number is required in your phone.',
           });
           return;
+        }
+
+        if (student.phone_number && simPhoneNumber) {
+          const studentNormPhone = normalizePhoneNumber(student.phone_number);
+          const simNormPhone = normalizePhoneNumber(simPhoneNumber);
+          if (studentNormPhone && simNormPhone && studentNormPhone !== simNormPhone) {
+            res.status(403).json({
+              success: false,
+              error: 'SIM_NUMBER_MISMATCH',
+              message: `❌ SIM card mismatch! Active device SIM does not match your registered number (${student.phone_number}).`,
+            });
+            return;
+          }
         }
       }
 
@@ -107,20 +130,6 @@ export class AttendanceController {
         });
         return;
       }
-
-      // 2. Fetch Session Details
-      const sessionRes = await query(
-        `SELECT s.*, c.class_name, c.subject
-         FROM attendance_sessions s
-         LEFT JOIN classes c ON s.class_id = c.id
-         WHERE s.id = $1`,
-        [sessionId]
-      );
-      if (!sessionRes.rows || sessionRes.rows.length === 0) {
-        res.status(404).json({ success: false, error: 'SESSION_NOT_FOUND', message: 'Attendance session not found.' });
-        return;
-      }
-      const session = sessionRes.rows[0];
 
       // Verify Session Status and Time Window
       const now = new Date();

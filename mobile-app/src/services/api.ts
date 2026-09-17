@@ -54,7 +54,7 @@ export const MobileApiService = {
   teacherLogin: (email: string, password: string) =>
     mobileApi.post('/auth/teacher/login', { email, password }),
 
-  startSession: (data: { auditoriumId: string; sessionName: string; targetDivisions?: string[] }) =>
+  startSession: (data: { auditoriumId: string; sessionName: string; targetDivisions?: string[]; requireSimVerification?: boolean }) =>
     mobileApi.post('/sessions/start', data),
 
   endSession: (id: string) =>
