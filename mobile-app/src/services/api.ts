@@ -65,4 +65,7 @@ export const MobileApiService = {
 
   manualMarkAttendance: (data: { sessionId: string; division: string; rollNumber: string }) =>
     mobileApi.post('/attendance/manual-mark', data),
+
+  deleteAttendanceRecord: (recordId: string) =>
+    mobileApi.delete(`/attendance/record/${recordId}`),
 };

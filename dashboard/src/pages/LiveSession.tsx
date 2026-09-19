@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../services/api.js';
-import { Radio, Play, Square, ShieldCheck, Wifi, Download, Building2, User, BookOpen } from 'lucide-react';
+import { Radio, Play, Square, ShieldCheck, Wifi, Download, Building2, User, BookOpen, Trash2 } from 'lucide-react';
 import { Modal } from '../components/Modal.js';
 import { useAuth } from '../context/AuthContext.js';
 
@@ -146,6 +146,16 @@ export const LiveSession: React.FC<{
       } catch (err) {
         console.error('Error ending session', err);
       }
+    }
+  };
+
+  const handleRemoveRecord = async (recordId: string, studentName: string) => {
+    if (!window.confirm(`Are you sure you want to remove attendance for '${studentName}' from this live session?`)) return;
+    try {
+      await ApiService.deleteAttendanceRecord(recordId);
+      await fetchAuditoriumStatus();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to remove attendance record');
     }
   };
 
@@ -350,6 +360,7 @@ export const LiveSession: React.FC<{
                       <th className="px-6 py-3.5">Time Checked In</th>
                       <th className="px-6 py-3.5">BLE Signal (RSSI)</th>
                       <th className="px-6 py-3.5">Security Verification</th>
+                      <th className="px-6 py-3.5 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -375,6 +386,15 @@ export const LiveSession: React.FC<{
                             <ShieldCheck className="w-3.5 h-3.5" />
                             <span>ESP32 HMAC VERIFIED</span>
                           </span>
+                        </td>
+                        <td className="px-6 py-3.5 text-right">
+                          <button
+                            onClick={() => handleRemoveRecord(rec.id, rec.full_name || rec.student_name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remove Student Attendance"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     ))}

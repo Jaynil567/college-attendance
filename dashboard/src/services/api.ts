@@ -62,6 +62,7 @@ export const ApiService = {
     api.post('/sessions/start', data),
   closeSession: (id: string) => api.post(`/sessions/${id}/close`),
   endSession: (id: string) => api.post(`/sessions/${id}/end`),
+  deleteAttendanceRecord: (id: string) => api.delete(`/attendance/record/${id}`),
 
   // Attendance Reports & Export
   getAttendanceReport: (params?: { classId?: string; sessionId?: string; studentId?: string; startDate?: string; endDate?: string; status?: string }) =>

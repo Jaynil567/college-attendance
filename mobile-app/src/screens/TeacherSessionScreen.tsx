@@ -96,6 +96,33 @@ export const TeacherSessionScreen: React.FC = () => {
     }
   };
 
+  const handleRemoveRecord = (recordId: string, studentName: string, rollNumber?: string) => {
+    Alert.alert(
+      'Remove Attendance?',
+      `Are you sure you want to remove ${studentName || 'this student'}${rollNumber ? ` (Roll: ${rollNumber})` : ''} from this live attendance session?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await MobileApiService.deleteAttendanceRecord(recordId);
+              if (res.data.success) {
+                Alert.alert('Removed', `Removed attendance for ${studentName || 'student'}`);
+                if (activeSession?.id) {
+                  fetchSessionRecords(activeSession.id);
+                }
+              }
+            } catch (err: any) {
+              Alert.alert('Error', err.response?.data?.message || 'Failed to remove attendance record');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const toggleDivision = (div: string) => {
     setSelectedDivisions((prev) =>
       prev.includes(div) ? prev.filter((d) => d !== div) : [...prev, div]
@@ -464,7 +491,16 @@ export const TeacherSessionScreen: React.FC = () => {
                             })
                           : 'Verified'}
                       </Text>
-                      <Text style={styles.recordBadge}>✅ Verified</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                        <Text style={styles.recordBadge}>✅ Verified</Text>
+                        <TouchableOpacity
+                          onPress={() => handleRemoveRecord(rec.id, rec.full_name || rec.student_name, rec.roll_number)}
+                          style={styles.removeRecordBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.removeRecordBtnText}>🗑️ Remove</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
                 ))
@@ -1252,5 +1288,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748B',
     marginTop: 2,
+  },
+  removeRecordBtn: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  removeRecordBtnText: {
+    color: '#DC2626',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

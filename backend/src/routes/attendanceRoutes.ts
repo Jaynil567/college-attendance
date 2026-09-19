@@ -21,4 +21,7 @@ router.get('/export', requireTeacherOrAdmin, AttendanceController.exportExcel);
 // Teacher/Admin manual attendance check-in (by Division & Roll Number)
 router.post('/manual-mark', requireTeacherOrAdmin, AttendanceController.manualMarkAttendance);
 
+// Teacher/Admin deletes/revokes a student's attendance record
+router.delete('/record/:id', requireTeacherOrAdmin, AttendanceController.deleteAttendanceRecord);
+
 export default router;

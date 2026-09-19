@@ -634,4 +634,41 @@ export class AttendanceController {
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
     }
   }
+
+  /**
+   * Teacher/Admin removes/deletes a student's attendance record from an active or past session
+   */
+  static async deleteAttendanceRecord(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.user || (req.user.role !== 'teacher' && req.user.role !== 'admin')) {
+        res.status(403).json({
+          success: false,
+          error: 'TEACHER_ONLY',
+          message: 'Only teachers or administrators can delete attendance records.',
+        });
+        return;
+      }
+
+      const { id } = req.params;
+      if (!id) {
+        res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'Record ID is required.' });
+        return;
+      }
+
+      const deleteRes = await query(`DELETE FROM attendance_records WHERE id = $1 RETURNING id, student_id, session_id`, [id]);
+      if (!deleteRes.rows || deleteRes.rows.length === 0) {
+        res.status(404).json({ success: false, error: 'NOT_FOUND', message: 'Attendance record not found.' });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Attendance record removed successfully',
+        deletedId: deleteRes.rows[0].id,
+      });
+    } catch (err: any) {
+      console.error('[AttendanceController.deleteAttendanceRecord]', err);
+      res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
+    }
+  }
 }
