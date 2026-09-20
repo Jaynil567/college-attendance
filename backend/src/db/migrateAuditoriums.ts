@@ -15,15 +15,9 @@ async function migrate() {
   await pool.query("UPDATE students SET plain_password = 'student123', password_hash = $1 WHERE plain_password IS NULL OR plain_password = 'student123'", [defaultHash]);
   console.log('✅ Added plain_password to students and synced password hashes');
 
-  // 1b. Ensure default teacher account exists
-  const teacherHash = await bcrypt.hash('Teacher@123', 10);
-  await pool.query(
-    `INSERT INTO users (id, full_name, email, phone_number, password_hash, role, department)
-     VALUES ('c3333333-3333-3333-3333-333333333333', 'Faculty Teacher', 'teacher@college.edu', '+919876543210', $1, 'teacher', 'Engineering Faculty')
-     ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
-    [teacherHash]
-  );
-  console.log('✅ Ensured teacher@college.edu / Teacher@123 exists');
+  // 1b. Delete default dummy teacher account
+  await pool.query("DELETE FROM users WHERE email = 'teacher@college.edu' OR full_name LIKE '%Alan Turing%'");
+  console.log('✅ Deleted dummy teacher@college.edu account');
 
   // 2. Attendance Sessions updates
   await pool.query('ALTER TABLE attendance_sessions ALTER COLUMN class_id DROP NOT NULL');

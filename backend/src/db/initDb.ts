@@ -152,7 +152,7 @@ export async function seedDatabase(): Promise<void> {
     };
 
     // Clean In-Memory store for production
-    mockStore.users = [adminUser, teacherUser];
+    mockStore.users = [adminUser];
     mockStore.classes = [];
     mockStore.students = [];
     mockStore.esp32_devices = [];
@@ -181,13 +181,8 @@ export async function seedDatabase(): Promise<void> {
           [adminUser.id, adminUser.full_name, adminUser.email, adminUser.phone_number, adminUser.password_hash, adminUser.role, adminUser.department]
         );
 
-        // Insert default teacher if not exists
-        await pool.query(
-          `INSERT INTO users (id, full_name, email, phone_number, password_hash, role, department)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           ON CONFLICT (email) DO NOTHING`,
-          [teacherUser.id, teacherUser.full_name, teacherUser.email, teacherUser.phone_number, teacherUser.password_hash, teacherUser.role, teacherUser.department]
-        );
+        // Remove dummy teacher account if exists
+        await pool.query("DELETE FROM users WHERE email = 'teacher@college.edu' OR full_name LIKE '%Alan Turing%'");
 
         // Provision 3 Fixed Auditorium Devices
         const audiDevices = [
@@ -212,7 +207,6 @@ export async function seedDatabase(): Promise<void> {
 
     console.log('✅ System ready for production:');
     console.log('   - Admin:   admin@college.edu   / Admin@123');
-    console.log('   - Teacher: teacher@college.edu / Teacher@123');
     console.log('   - Students: Managed directly via Dashboard');
   } catch (err: any) {
     console.error('[DB Seed] Error:', err);

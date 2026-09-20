@@ -38,15 +38,6 @@ async function resetDbForProduction() {
     );
     console.log('✅ Admin account created:   admin@college.edu   / Admin@123');
 
-    // 4. Insert Teacher account
-    const teacherId = crypto.randomUUID();
-    await pool.query(
-      `INSERT INTO users (id, full_name, email, phone_number, password_hash, role, department, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'teacher', 'Engineering Faculty', NOW(), NOW())`,
-      [teacherId, 'Head Professor', 'teacher@college.edu', '+1-555-0002', teacherHash]
-    );
-    console.log('✅ Teacher account created: teacher@college.edu / Teacher@123');
-
     // 5. Verify database counts
     const userCount = await pool.query('SELECT count(*)::int as count FROM users');
     const studentCount = await pool.query('SELECT count(*)::int as count FROM students');
