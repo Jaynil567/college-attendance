@@ -14,6 +14,7 @@ import { ClassItem } from './types/index.js';
 export const AppContent: React.FC = () => {
   const { user, token, isLoading } = useAuth();
   const [currentTab, setCurrentTab] = useState<TabType>('overview');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (user && user.role !== 'admin') {
@@ -83,16 +84,20 @@ export const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      <Navbar activeSessionCount={0} />
+      <Navbar
+        toggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
+        isMobileMenuOpen={isMobileMenuOpen}
+      />
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 relative">
         <Sidebar
           currentTab={currentTab}
           setCurrentTab={setCurrentTab}
-          activeSessionCount={0}
+          isMobileOpen={isMobileMenuOpen}
+          closeMobileMenu={() => setIsMobileMenuOpen(false)}
         />
 
-        <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
           {currentTab === 'overview' && (
             <DashboardOverview
               stats={stats}
