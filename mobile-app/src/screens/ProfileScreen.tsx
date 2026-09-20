@@ -44,7 +44,7 @@ export const ProfileScreen: React.FC = () => {
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Email Address</Text>
-          <Text style={styles.val}>{student?.email || (student?.enrollmentNumber ? `${student.enrollmentNumber.toLowerCase()}@ljku.edu.in` : 'Registered Student')}</Text>
+          <Text style={styles.val}>{student?.email || (student?.enrollmentNumber ? `${student.enrollmentNumber.toLowerCase()}@mail.ljku.edu.in` : 'Registered Student')}</Text>
         </View>
         <View style={[styles.row, styles.noBorder]}>
           <Text style={styles.label}>Phone / SIM</Text>

@@ -69,11 +69,13 @@ export class StudentController {
       const passwordHash = await bcrypt.hash(studentPassword, salt);
       const studentId = crypto.randomUUID();
 
+      const studentEmail = email?.trim() || `${cleanEnrollment.toLowerCase()}@mail.ljku.edu.in`;
+
       const result = await query(
         `INSERT INTO students (id, enrollment_number, full_name, division, roll_number, group_name, email, phone_number, password_hash, plain_password, class_id, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
          RETURNING id, enrollment_number, full_name, division, roll_number, group_name, email, phone_number, plain_password, class_id, status, created_at`,
-        [studentId, cleanEnrollment, fullName.trim(), division?.trim() || null, rollNumber?.trim() || null, groupName?.trim() || null, email?.trim() || null, phoneNumber?.trim() || null, passwordHash, studentPassword, classId || null, status]
+        [studentId, cleanEnrollment, fullName.trim(), division?.trim() || null, rollNumber?.trim() || null, groupName?.trim() || null, studentEmail, phoneNumber?.trim() || null, passwordHash, studentPassword, classId || null, status]
       );
 
       res.status(201).json({
