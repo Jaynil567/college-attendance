@@ -175,7 +175,7 @@ export class SessionController {
          LEFT JOIN users t ON s.created_by = t.id
          LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.status = 'present'
          WHERE s.status = 'active'
-         GROUP BY s.id, t.full_name`
+         GROUP BY s.id, s.session_name, s.auditorium_id, s.auditorium_name, s.target_divisions, s.start_time, s.end_time, s.created_by, s.require_sim_verification, t.full_name`
       );
       const activeSessions = activeSessionsRes.rows || [];
 

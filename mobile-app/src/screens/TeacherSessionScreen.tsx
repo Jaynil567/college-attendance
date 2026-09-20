@@ -146,13 +146,19 @@ export const TeacherSessionScreen: React.FC = () => {
         setAuditoriumsStatus(res.data.auditoriums);
 
         // Check if any auditorium has a session created by this teacher
-        const myActive = res.data.auditoriums.find(
-          (a: any) =>
-            a.isLive &&
-            a.activeSession &&
-            (a.activeSession.teacherName === teacher?.fullName ||
-              a.activeSession.created_by === teacher?.id)
-        );
+        const teacherIdStr = teacher?.id ? String(teacher.id) : '';
+        const teacherNameStr = teacher?.fullName ? teacher.fullName.trim().toLowerCase() : '';
+
+        const myActive = res.data.auditoriums.find((a: any) => {
+          if (!a.isLive || !a.activeSession) return false;
+          const s = a.activeSession;
+          const sCreatedBy = s.created_by || s.createdBy ? String(s.created_by || s.createdBy) : '';
+          const sTeacherName = s.teacherName || s.teacher_name ? String(s.teacherName || s.teacher_name).trim().toLowerCase() : '';
+
+          if (teacherIdStr && sCreatedBy && teacherIdStr === sCreatedBy) return true;
+          if (teacherNameStr && sTeacherName && teacherNameStr === sTeacherName) return true;
+          return false;
+        });
 
         if (myActive && myActive.activeSession) {
           setActiveSession(myActive.activeSession);
@@ -254,7 +260,6 @@ export const TeacherSessionScreen: React.FC = () => {
           `Cannot start attendance session because Bluetooth is disabled.\n\n${btCheck.reason || 'Please turn ON Bluetooth in your phone settings and try again.'}`,
           [{ text: 'OK' }]
         );
-        setStarting(false);
         return;
       }
 
@@ -266,7 +271,19 @@ export const TeacherSessionScreen: React.FC = () => {
       });
 
       if (res.data.success && res.data.session) {
-        setActiveSession(res.data.session);
+        const sess = res.data.session;
+        // Standardize session fields for UI
+        const formattedSession = {
+          id: sess.id,
+          sessionName: sess.session_name || sess.sessionName || subjectTitle.trim(),
+          session_name: sess.session_name || sess.sessionName || subjectTitle.trim(),
+          auditoriumId: selectedAudiId,
+          created_by: teacher?.id,
+          createdBy: teacher?.id,
+          teacherName: teacher?.fullName,
+        };
+
+        setActiveSession(formattedSession);
         setSessionRecords([]);
         setElapsedSeconds(0);
 
@@ -279,8 +296,6 @@ export const TeacherSessionScreen: React.FC = () => {
             Alert.alert('BLE Warning', `Could not start BLE beacon: ${bleRes.error || 'Unknown error'}. Students may not be able to verify proximity.`);
           }
         }
-
-        await checkStatus();
       } else {
         Alert.alert('Error', res.data.message || 'Could not start attendance session.');
       }
