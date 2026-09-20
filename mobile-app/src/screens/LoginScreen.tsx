@@ -179,9 +179,7 @@ export const LoginScreen: React.FC = () => {
           style={styles.serverConfigToggle}
           onPress={() => setShowServerConfig(!showServerConfig)}
         >
-          <Text style={styles.serverConfigToggleText}>
-            ⚙️ {showServerConfig ? 'Hide Server Settings' : 'Server Connection Settings'}
-          </Text>
+          
         </TouchableOpacity>
 
         {showServerConfig && (

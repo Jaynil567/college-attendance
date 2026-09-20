@@ -54,6 +54,12 @@
       "expo-secure-store",
       "expo-local-authentication",
       "./plugins/withBleAdvertiserFix.js"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7758bd0c-c5d8-4626-a6ed-94849cd16711"
+      }
+    },
+    "owner": "ljiet_1"
   }
 }
