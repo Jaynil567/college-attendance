@@ -246,6 +246,18 @@ export const TeacherSessionScreen: React.FC = () => {
 
     setStarting(true);
     try {
+      // Pre-flight Bluetooth hardware check: Bluetooth MUST be turned ON
+      const btCheck = await BleService.isBluetoothEnabled();
+      if (!btCheck.enabled) {
+        Alert.alert(
+          '⚠️ Bluetooth Required',
+          `Cannot start attendance session because Bluetooth is disabled.\n\n${btCheck.reason || 'Please turn ON Bluetooth in your phone settings and try again.'}`,
+          [{ text: 'OK' }]
+        );
+        setStarting(false);
+        return;
+      }
+
       const res = await MobileApiService.startSession({
         auditoriumId: selectedAudiId,
         sessionName: subjectTitle.trim(),

@@ -43,6 +43,57 @@ export class BleService {
     return true;
   }
 
+  /**
+   * Check if Bluetooth hardware is powered ON and required permissions are granted
+   */
+  public static async isBluetoothEnabled(): Promise<{ enabled: boolean; reason?: string }> {
+    const hasPermission = await this.requestPermissions();
+    if (!hasPermission) {
+      return { enabled: false, reason: 'Bluetooth & Location permissions are not granted in phone settings.' };
+    }
+
+    try {
+      const { BleManager } = require('react-native-ble-plx');
+      const manager = new BleManager();
+
+      let state = await manager.state();
+
+      // If state is Unknown or Resetting initially, wait up to 1 second for state update
+      if (state === 'Unknown' || state === 'Resetting') {
+        await new Promise<void>((resolve) => {
+          const subscription = manager.onStateChange((newState: string) => {
+            if (newState !== 'Unknown' && newState !== 'Resetting') {
+              state = newState;
+              subscription.remove();
+              resolve();
+            }
+          }, true);
+          setTimeout(() => {
+            subscription.remove();
+            resolve();
+          }, 1000);
+        });
+      }
+
+      manager.destroy();
+
+      if (state === 'PoweredOn') {
+        return { enabled: true };
+      } else if (state === 'PoweredOff') {
+        return { enabled: false, reason: 'Bluetooth is turned OFF on your phone.' };
+      } else if (state === 'Unauthorized') {
+        return { enabled: false, reason: 'Bluetooth permission is unauthorized on your phone.' };
+      } else if (state === 'Unsupported') {
+        return { enabled: false, reason: 'Bluetooth Low Energy is not supported on this device.' };
+      } else {
+        return { enabled: false, reason: `Bluetooth state is ${state}. Please make sure Bluetooth is ON.` };
+      }
+    } catch (err: any) {
+      console.warn('[BLE] Could not check Bluetooth state:', err?.message || err);
+      return { enabled: false, reason: 'Could not determine Bluetooth hardware status. Please turn on Bluetooth.' };
+    }
+  }
+
   // ══════════════════════════════════════════════════════════
   // TEACHER SIDE — BLE Advertising
   // ══════════════════════════════════════════════════════════
