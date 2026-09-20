@@ -111,7 +111,7 @@ export const LoginScreen: React.FC = () => {
                 style={styles.input}
                 value={enrollmentNumber}
                 onChangeText={setEnrollmentNumber}
-                placeholder="e.g. 24002171210010"
+                placeholder="e.g. 24002171310001"
                 autoCapitalize="characters"
                 placeholderTextColor="#94A3B8"
               />
