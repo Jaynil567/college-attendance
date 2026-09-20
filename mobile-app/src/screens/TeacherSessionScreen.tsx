@@ -158,7 +158,7 @@ export const TeacherSessionScreen: React.FC = () => {
           setActiveSession(myActive.activeSession);
           setSelectedAudiId(myActive.id);
           fetchSessionRecords(myActive.activeSession.id);
-        } else if (!activeSession) {
+        } else {
           setActiveSession(null);
           setSessionRecords([]);
         }
@@ -342,21 +342,37 @@ export const TeacherSessionScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             setEnding(true);
+            const endedSessionName = activeSession.sessionName || activeSession.session_name || subjectTitle;
+            const recordCount = sessionRecords.length;
             try {
+              // 1. Close session in backend DB
               await MobileApiService.endSession(activeSession.id);
 
-              // Stop BLE beacon broadcasting
+              // 2. Stop BLE beacon broadcasting immediately
               await BleService.stopAdvertising();
-              setBleActive(false);
 
-              Alert.alert(
-                'Attendance Completed',
-                `Attendance recorded for ${sessionRecords.length} students in ${activeSession.sessionName || subjectTitle}.`
-              );
+              // 3. Clear timers immediately
+              if (timerRef.current) clearInterval(timerRef.current);
+              if (pollRef.current) clearInterval(pollRef.current);
+
+              // 4. Reset ALL component states to allow starting a new session immediately
               setActiveSession(null);
               setSessionRecords([]);
               setSubjectTitle('');
+              setSelectedDivisions([]);
+              setManualDivision('');
+              setManualRollNumber('');
+              setElapsedSeconds(0);
+              setBleActive(false);
+
+              // 5. Fetch fresh auditoriums status so the auditorium is marked Vacant/Available again
               await checkStatus();
+
+              // 6. Alert teacher
+              Alert.alert(
+                'Attendance Completed ✅',
+                `Attendance recorded for ${recordCount} student(s) in "${endedSessionName}". You can now start a new lecture session!`
+              );
             } catch (err: any) {
               Alert.alert('Error', err.response?.data?.message || 'Could not end session.');
             } finally {

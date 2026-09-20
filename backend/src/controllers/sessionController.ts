@@ -229,6 +229,8 @@ export class SessionController {
                 subject: activeSession.session_name,
                 sessionName: activeSession.session_name,
                 teacherName: activeSession.teacher_name || 'Faculty',
+                createdBy: activeSession.created_by,
+                created_by: activeSession.created_by,
                 startTime: activeSession.start_time,
                 targetDivisions: activeSession.target_divisions,
                 presentCount: activeSession.present_count || 0,
