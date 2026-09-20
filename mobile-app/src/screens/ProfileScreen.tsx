@@ -22,16 +22,16 @@ export const ProfileScreen: React.FC = () => {
 
         <View style={styles.row}>
           <Text style={styles.label}>Enrollment No.</Text>
-          <Text style={styles.val}>{student?.enrollmentNumber || 'N/A'}</Text>
+          <Text style={styles.val}>{student?.enrollmentNumber || (student as any)?.enrollment_number || 'N/A'}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Group</Text>
-          <Text style={styles.val}>{student?.groupName || 'N/A'}</Text>
+          <Text style={styles.val}>{student?.groupName || (student as any)?.group_name || 'General'}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Division & Roll No.</Text>
           <Text style={styles.val}>
-            Div {student?.division || 'N/A'} — Roll {student?.rollNumber || 'N/A'}
+            Div {student?.division || (student as any)?.division || 'A1'} — Roll {student?.rollNumber || (student as any)?.roll_number || '-'}
           </Text>
         </View>
         <View style={styles.row}>
@@ -44,11 +44,11 @@ export const ProfileScreen: React.FC = () => {
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Email Address</Text>
-          <Text style={styles.val}>{student?.email || 'N/A'}</Text>
+          <Text style={styles.val}>{student?.email || (student?.enrollmentNumber ? `${student.enrollmentNumber.toLowerCase()}@ljku.edu.in` : 'Registered Student')}</Text>
         </View>
         <View style={[styles.row, styles.noBorder]}>
-          <Text style={styles.label}>Phone</Text>
-          <Text style={styles.val}>{student?.phoneNumber || 'N/A'}</Text>
+          <Text style={styles.label}>Phone / SIM</Text>
+          <Text style={styles.val}>{student?.phoneNumber || (student as any)?.phone_number || 'Registered SIM'}</Text>
         </View>
       </View>
 

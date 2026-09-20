@@ -199,13 +199,41 @@ export class AuthController {
       if (req.user.role === 'student') {
         const result = await query(
           `SELECT s.id, s.enrollment_number, s.full_name, s.email, s.phone_number, s.status,
-                  c.id as class_id, c.class_name, c.subject, c.semester, c.division
+                  s.division, s.group_name, s.roll_number, s.device_id,
+                  c.id as class_id, c.class_name, c.subject, c.semester
            FROM students s
            LEFT JOIN classes c ON s.class_id = c.id
            WHERE s.id = $1`,
           [req.user.id]
         );
-        res.status(200).json({ success: true, user: result.rows[0], role: 'student' });
+        const s = result.rows[0];
+        if (!s) {
+          res.status(404).json({ success: false, error: 'STUDENT_NOT_FOUND' });
+          return;
+        }
+
+        const studentData = {
+          id: s.id,
+          enrollmentNumber: s.enrollment_number,
+          enrollment_number: s.enrollment_number,
+          fullName: s.full_name,
+          full_name: s.full_name,
+          email: s.email,
+          phoneNumber: s.phone_number,
+          phone_number: s.phone_number,
+          division: s.division || s.division_class || null,
+          groupName: s.group_name,
+          group_name: s.group_name,
+          rollNumber: s.roll_number,
+          roll_number: s.roll_number,
+          status: s.status,
+          deviceBound: !!s.device_id,
+          className: s.class_name,
+          subject: s.subject,
+          semester: s.semester,
+        };
+
+        res.status(200).json({ success: true, user: studentData, student: studentData, role: 'student' });
         return;
       }
 

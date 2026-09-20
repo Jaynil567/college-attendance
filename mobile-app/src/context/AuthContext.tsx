@@ -86,15 +86,29 @@ export const MobileAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const meRes = await MobileApiService.getMe();
             if (meRes.data.success) {
               if (savedRole === 'student') {
-                const userData = JSON.parse(savedUserData);
-                setStudent(userData);
+                const st = meRes.data.user || meRes.data.student || JSON.parse(savedUserData);
+                const studentObj = {
+                  id: st.id,
+                  enrollmentNumber: st.enrollmentNumber || st.enrollment_number,
+                  fullName: st.fullName || st.full_name,
+                  email: st.email || null,
+                  phoneNumber: st.phoneNumber || st.phone_number || null,
+                  division: st.division || null,
+                  groupName: st.groupName || st.group_name || null,
+                  rollNumber: st.rollNumber || st.roll_number || null,
+                  status: st.status || 'active',
+                  deviceBound: st.deviceBound || !!st.device_id,
+                };
+                setStudent(studentObj as any);
                 setTeacher(null);
                 setRole('student');
+                await SecureStore.setItemAsync(SECURE_USER_KEY, JSON.stringify(studentObj));
               } else if (savedRole === 'teacher') {
-                const userData = JSON.parse(savedUserData);
+                const userData = meRes.data.user || meRes.data.teacher || JSON.parse(savedUserData);
                 setTeacher(userData);
                 setStudent(null);
                 setRole('teacher');
+                await SecureStore.setItemAsync(SECURE_USER_KEY, JSON.stringify(userData));
               }
             } else {
               // Token invalid, clear stored data
@@ -135,14 +149,27 @@ export const MobileAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const res = await MobileApiService.login(enrollmentNumber, password, deviceFingerprint);
       if (res.data.success && res.data.token) {
         setToken(res.data.token);
-        setStudent(res.data.student);
+        const st = res.data.student || res.data.user;
+        const studentObj = {
+          id: st.id,
+          enrollmentNumber: st.enrollmentNumber || st.enrollment_number,
+          fullName: st.fullName || st.full_name,
+          email: st.email || null,
+          phoneNumber: st.phoneNumber || st.phone_number || null,
+          division: st.division || null,
+          groupName: st.groupName || st.group_name || null,
+          rollNumber: st.rollNumber || st.roll_number || null,
+          status: st.status || 'active',
+          deviceBound: st.deviceBound || !!st.device_id,
+        };
+        setStudent(studentObj as any);
         setTeacher(null);
         setRole('student');
         setAuthToken(res.data.token);
 
         // Persist session in SecureStore
         await SecureStore.setItemAsync(SECURE_TOKEN_KEY, res.data.token);
-        await SecureStore.setItemAsync(SECURE_USER_KEY, JSON.stringify(res.data.student));
+        await SecureStore.setItemAsync(SECURE_USER_KEY, JSON.stringify(studentObj));
         await SecureStore.setItemAsync(SECURE_ROLE_KEY, 'student');
 
         return { success: true };
