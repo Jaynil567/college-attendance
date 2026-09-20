@@ -1,8 +1,8 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext.js';
-import { LogOut, Shield, User, Radio } from 'lucide-react';
+import { LogOut, GraduationCap } from 'lucide-react';
 
-export const Navbar: React.FC<{ activeSessionCount: number }> = ({ activeSessionCount }) => {
+export const Navbar: React.FC<{ activeSessionCount?: number }> = () => {
   const { user, logout } = useAuth();
 
   return (
@@ -10,30 +10,17 @@ export const Navbar: React.FC<{ activeSessionCount: number }> = ({ activeSession
       <div className="px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="bg-blue-600 text-white p-2 rounded-xl shadow-md shadow-blue-500/20">
-            <Radio className="w-5 h-5 animate-pulse" />
+            <GraduationCap className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold text-lg text-slate-800 leading-tight">Classroom BLE Attendance</h1>
-            <p className="text-xs text-slate-500">Hardware-Cryptographic Presence Verification</p>
+            <h1 className="font-bold text-lg text-slate-800 leading-tight">College Attendance System</h1>
+            <p className="text-xs text-slate-500">Student & Faculty Administration Console</p>
           </div>
         </div>
 
         <div className="flex items-center space-x-4">
-          {/* Active Session Indicator */}
-          {activeSessionCount > 0 ? (
-            <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-              <span>{activeSessionCount} Active Session Live</span>
-            </div>
-          ) : (
-            <div className="hidden sm:flex items-center space-x-1.5 bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-              <span>No Active Session</span>
-            </div>
-          )}
-
           {/* User Profile Pill */}
-          <div className="flex items-center space-x-3 pl-2 border-l border-slate-200">
+          <div className="flex items-center space-x-3 pl-2">
             <div className="text-right hidden md:block">
               <p className="text-sm font-semibold text-slate-800">{user?.fullName || (user as any)?.full_name || 'Staff'}</p>
               <div className="flex items-center justify-end space-x-1">

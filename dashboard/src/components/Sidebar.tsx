@@ -1,48 +1,32 @@
 import React from 'react';
 import {
   LayoutDashboard,
-  Radio,
-  BookOpen,
   Users,
   GraduationCap,
-  Cpu,
   FileSpreadsheet,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 
-export type TabType = 'overview' | 'live' | 'classes' | 'students' | 'teachers' | 'devices' | 'reports';
+export type TabType = 'overview' | 'classes' | 'students' | 'teachers' | 'reports';
 
 interface SidebarProps {
   currentTab: TabType;
   setCurrentTab: (tab: TabType) => void;
-  activeSessionCount: number;
+  activeSessionCount?: number;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, activeSessionCount }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
   const menuItems = isAdmin
     ? [
         { id: 'overview' as TabType, label: 'Overview', icon: LayoutDashboard },
-        {
-          id: 'live' as TabType,
-          label: 'Live Lecture Sessions',
-          icon: Radio,
-          badge: activeSessionCount > 0 ? `${activeSessionCount}` : null,
-        },
-        { id: 'devices' as TabType, label: 'Auditorium Hardware (ESP32)', icon: Cpu },
         { id: 'students' as TabType, label: 'Student Directory & Passwords', icon: Users },
         { id: 'teachers' as TabType, label: 'Faculty & Teachers', icon: GraduationCap },
         { id: 'reports' as TabType, label: 'Attendance Records & Excel', icon: FileSpreadsheet },
       ]
     : [
-        {
-          id: 'live' as TabType,
-          label: 'Start Lecture Session',
-          icon: Radio,
-          badge: activeSessionCount > 0 ? `${activeSessionCount}` : null,
-        },
         { id: 'students' as TabType, label: 'Student Directory', icon: Users },
         { id: 'reports' as TabType, label: 'Attendance Records & Excel', icon: FileSpreadsheet },
       ];
@@ -75,11 +59,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, act
                 <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
                 <span>{item.label}</span>
               </div>
-              {item.badge && (
-                <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full font-bold animate-pulse">
-                  {item.badge}
-                </span>
-              )}
             </button>
           );
         })}
@@ -87,11 +66,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, act
 
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
         <div className="flex items-center space-x-2 text-slate-700 font-semibold text-xs mb-1">
-          <Cpu className="w-3.5 h-3.5 text-blue-600" />
-          <span>BLE Hardware Security</span>
+          <span>College Attendance System</span>
         </div>
         <p className="text-[11px] text-slate-500 leading-tight">
-          Cryptographic HMAC-SHA256 & replay defense active for all classroom nodes.
+          Management Console & Student Credentials Portal.
         </p>
       </div>
     </aside>
