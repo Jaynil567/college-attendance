@@ -35,18 +35,23 @@ export const AppContent: React.FC = () => {
   const loadData = async () => {
     if (!token) return;
     try {
-      const [classesRes, studentsRes] = await Promise.all([
+      const [classesRes, studentsRes, reportRes] = await Promise.all([
         ApiService.getClasses(),
         ApiService.getStudents(),
+        ApiService.getAttendanceReport({ status: 'present' }),
       ]);
 
       if (classesRes.data.success) setClasses(classesRes.data.classes || []);
 
       const studentCount = studentsRes.data.success ? studentsRes.data.count || 0 : 0;
+      const records = reportRes.data.success ? reportRes.data.records || [] : [];
+      const presentCount = records.length;
+      const realAttendanceRate = studentCount > 0 ? Math.min(100, Math.round((presentCount / studentCount) * 100)) : 0;
+
       setStats({
         totalStudents: studentCount,
         totalClasses: classesRes.data.classes?.length || 0,
-        todayAttendanceRate: 92,
+        todayAttendanceRate: realAttendanceRate,
       });
     } catch (err) {
       console.error('Error fetching dashboard data', err);

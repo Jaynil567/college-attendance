@@ -342,7 +342,8 @@ export class SessionController {
       let sql = `
         SELECT s.*, 
                t.full_name as teacher_name,
-               COUNT(ar.id)::int as present_count
+               COUNT(DISTINCT ar.student_id)::int as present_count,
+               (SELECT COUNT(*)::int FROM students WHERE status = 'active') as total_students
         FROM attendance_sessions s
         LEFT JOIN users t ON s.created_by = t.id
         LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.status = 'present'

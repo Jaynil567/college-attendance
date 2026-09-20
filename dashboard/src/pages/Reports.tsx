@@ -18,12 +18,19 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  const [totalStudents, setTotalStudents] = useState<number>(0);
 
   const fetchSessions = async () => {
     try {
-      const res = await ApiService.getAllSessions();
-      if (res.data.success) {
-        setSessions(res.data.sessions || []);
+      const [sessRes, studRes] = await Promise.all([
+        ApiService.getAllSessions(),
+        ApiService.getStudents(),
+      ]);
+      if (sessRes.data.success) {
+        setSessions(sessRes.data.sessions || []);
+      }
+      if (studRes.data.success) {
+        setTotalStudents(studRes.data.count || studRes.data.students?.length || 0);
       }
     } catch (err) {
       console.error('Error fetching sessions list', err);
@@ -94,9 +101,11 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
     }
   };
 
-  const total = records.length;
-  const present = records.filter((r) => r.status === 'present').length;
-  const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+  const totalLogs = records.length;
+  const presentCount = records.filter((r) => r.status === 'present').length;
+  const baseTotalStudents = totalStudents > 0 ? totalStudents : totalLogs;
+  const absentCount = Math.max(0, baseTotalStudents - presentCount);
+  const realAttendanceRate = baseTotalStudents > 0 ? Math.min(100, Math.round((presentCount / baseTotalStudents) * 100)) : 0;
 
   // Format target divisions JSON or string
   const formatDivisions = (rawDivs: any) => {
@@ -241,10 +250,11 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
           </div>
 
           {/* Summary Mini Pills */}
-          <div className="flex items-center space-x-3 text-xs font-semibold text-slate-600">
-            <span>Total Log Entries: <strong className="text-slate-900">{total}</strong></span>
-            <span>Present: <strong className="text-emerald-700">{present}</strong></span>
-            <span>Attendance Rate: <strong className="text-blue-700">{rate}%</strong></span>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+            <span className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg border border-slate-200">Total Logs: <strong className="text-slate-900">{totalLogs}</strong></span>
+            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg border border-emerald-200">Present: <strong className="text-emerald-700">{presentCount}</strong></span>
+            <span className="px-2.5 py-1 bg-red-50 text-red-800 rounded-lg border border-red-200">Absent: <strong className="text-red-600">{absentCount}</strong></span>
+            <span className="px-2.5 py-1 bg-blue-50 text-blue-800 rounded-lg border border-blue-200">Attendance Rate: <strong className="text-blue-700">{realAttendanceRate}%</strong></span>
           </div>
         </div>
       </div>
@@ -270,6 +280,11 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
                 const isExpanded = expandedSessionId === sess.id;
                 const sessionRecordsList = records.filter((r: any) => r.session_id === sess.id || r.session_name === sess.session_name);
                 const isLive = sess.status === 'active';
+
+                const sessPresent = sess.present_count !== undefined ? sess.present_count : sessionRecordsList.length;
+                const sessTotal = sess.total_students || totalStudents;
+                const sessAbsent = Math.max(0, sessTotal - sessPresent);
+                const sessRate = sessTotal > 0 ? Math.min(100, Math.round((sessPresent / sessTotal) * 100)) : 0;
 
                 return (
                   <div key={sess.id} className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3 transition-all hover:border-slate-300">
@@ -310,9 +325,17 @@ export const Reports: React.FC<{ classes: ClassItem[] }> = ({ classes }) => {
 
                       {/* Action Buttons */}
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs text-slate-500 mr-2">
-                          Present: <strong className="text-emerald-700 font-bold">{sess.present_count || sessionRecordsList.length}</strong>
-                        </span>
+                        <div className="flex items-center space-x-1.5 text-xs mr-2">
+                          <span className="px-2 py-1 bg-emerald-50 text-emerald-800 rounded-md font-bold border border-emerald-200">
+                            Present: {sessPresent}
+                          </span>
+                          <span className="px-2 py-1 bg-red-50 text-red-800 rounded-md font-bold border border-red-200">
+                            Absent: {sessAbsent}
+                          </span>
+                          <span className="px-2 py-1 bg-blue-50 text-blue-800 rounded-md font-bold border border-blue-200">
+                            Rate: {sessRate}%
+                          </span>
+                        </div>
 
                         <button
                           onClick={() => handleExportSessionXlsx(sess.id, sess.session_name)}
