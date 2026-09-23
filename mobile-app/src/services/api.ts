@@ -68,4 +68,21 @@ export const MobileApiService = {
 
   deleteAttendanceRecord: (recordId: string) =>
     mobileApi.delete(`/attendance/record/${recordId}`),
+
+  // Student Directory & Device Management
+  getStudents: (params?: { search?: string; division?: string; status?: string }) =>
+    mobileApi.get('/students', { params }),
+
+  updateStudent: (id: string, data: any) =>
+    mobileApi.put(`/students/${id}`, data),
+
+  resetAllPasswords: () =>
+    mobileApi.post('/students/reset-all-passwords'),
+
+  // Past Sessions & Reports
+  getAllSessions: () =>
+    mobileApi.get('/sessions/all'),
+
+  getAttendanceReport: (params?: { sessionId?: string; startDate?: string; endDate?: string }) =>
+    mobileApi.get('/attendance/report', { params }),
 };
