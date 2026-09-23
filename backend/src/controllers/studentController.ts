@@ -380,6 +380,7 @@ export class StudentController {
         { header: 'Roll Number', key: 'rollNumber', width: 14 },
         { header: 'Enrollment Number', key: 'enrollment', width: 22 },
         { header: 'Name Of Student', key: 'name', width: 32 },
+        { header: 'Mobile Number', key: 'phone', width: 18 },
         { header: 'Password', key: 'password', width: 14 },
       ];
 
@@ -391,6 +392,7 @@ export class StudentController {
           rollNumber: student.roll_number || 'N/A',
           enrollment: student.enrollment_number,
           name: student.full_name,
+          phone: student.phone_number || 'N/A',
           password: student.plain_password,
         });
       });

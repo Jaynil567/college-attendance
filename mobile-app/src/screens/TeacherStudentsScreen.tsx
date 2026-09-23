@@ -31,6 +31,11 @@ export const TeacherStudentsScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDivision, setSelectedDivision] = useState<string>('ALL');
   const [resettingPasswords, setResettingPasswords] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+
+  const togglePasswordVisibility = (id: string) => {
+    setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const fetchStudents = async () => {
     try {
@@ -254,6 +259,11 @@ export const TeacherStudentsScreen: React.FC = () => {
         }
         renderItem={({ item }) => {
           const isBound = !!item.device_id;
+          const keyId = item.id || item.enrollment_number;
+          const showPass = visiblePasswords[keyId];
+          const displayPhone = item.phone_number || item.phoneNumber || 'No Mobile';
+          const displayPassword = item.plain_password || 'student123';
+
           return (
             <View style={styles.studentCard}>
               <View style={styles.studentMainInfo}>
@@ -262,6 +272,19 @@ export const TeacherStudentsScreen: React.FC = () => {
                   Group: {item.group_name || '-'} | Div: {item.division || '-'} | Roll: {item.roll_number || '-'}
                 </Text>
                 <Text style={styles.studentEnrollment}>{item.enrollment_number}</Text>
+
+                {/* Mobile Number & Password Row */}
+                <View style={styles.contactRow}>
+                  <Text style={styles.phoneBadgeText}>📞 {displayPhone}</Text>
+                  <TouchableOpacity
+                    style={styles.passwordToggleBtn}
+                    onPress={() => togglePasswordVisibility(keyId)}
+                  >
+                    <Text style={styles.passwordBadgeText}>
+                      🔑 {showPass ? displayPassword : '••••••••'} {showPass ? '👁️' : '👁️‍🗨️'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.studentRightActions}>
@@ -482,5 +505,35 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 10,
     fontWeight: '700',
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  phoneBadgeText: {
+    fontSize: 11,
+    color: '#047857',
+    fontWeight: '700',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  passwordToggleBtn: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  passwordBadgeText: {
+    fontSize: 11,
+    color: '#1E293B',
+    fontWeight: '800',
+    fontFamily: 'monospace',
   },
 });
